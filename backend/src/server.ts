@@ -8,7 +8,16 @@ async function start(): Promise<void> {
     const applied = await runMigrations(pool);
     applied.forEach((name) => console.log(`Migración aplicada: ${name}`));
 
-    const app = createApp({ pool, port: env.PORT });
+    const app = createApp({
+      pool,
+      config: {
+        port: env.PORT,
+        jwtAccessSecret: env.JWT_ACCESS_SECRET,
+        accessTokenTtlSeconds: env.ACCESS_TOKEN_TTL_SECONDS,
+        refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
+        cookieSecure: env.COOKIE_SECURE,
+      },
+    });
     app.listen(env.PORT, () => {
       console.log(`Servidor en http://localhost:${env.PORT}`);
       console.log(`Swagger en  http://localhost:${env.PORT}/api-docs`);

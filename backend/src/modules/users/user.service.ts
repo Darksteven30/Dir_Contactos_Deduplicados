@@ -26,7 +26,7 @@ export class UserService {
       throw new ConflictError('El email ya está registrado');
     }
     const passwordHash = await this.hasher.hash(dto.password);
-    return this.users.create({ name: dto.name, email: dto.email, passwordHash });
+    return this.users.create({ name: dto.name, email: dto.email, passwordHash, role: dto.role });
   }
 
   async update(id: number, dto: UpdateUserDto): Promise<User> {

@@ -9,6 +9,11 @@ const envSchema = z.object({
   DB_NAME: z.string().min(1),
   DB_USER: z.string().min(1),
   DB_PASSWORD: z.string(),
+
+  JWT_ACCESS_SECRET: z.string().min(32, 'Debe tener al menos 32 caracteres'),
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  COOKIE_SECURE: z.stringbool().default(true),
 });
 
 export type Env = z.infer<typeof envSchema>;
