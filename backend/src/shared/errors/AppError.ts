@@ -19,6 +19,18 @@ export class ValidationError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message = 'No autenticado') {
+    super(message, 401);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'No tienes permiso para realizar esta acción') {
+    super(message, 403);
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message = 'Recurso no encontrado') {
     super(message, 404);
@@ -28,5 +40,11 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   constructor(message = 'Conflicto con el estado actual del recurso') {
     super(message, 409);
+  }
+}
+
+export class TooManyRequestsError extends AppError {
+  constructor(message = 'Demasiadas solicitudes, intenta más tarde') {
+    super(message, 429);
   }
 }
