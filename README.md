@@ -47,7 +47,7 @@ Crear la base de datos `contactos_db` en PostgreSQL (por ejemplo desde DBeaver).
 
 ```bash
 cd backend
-cp .env.example .env   # completar DB_PASSWORD
+cp .env.example .env   # completar DB_PASSWORD y JWT_ACCESS_SECRET
 npm install
 npm run dev              # aplica migraciones pendientes y arranca en modo watch
 ```
@@ -63,6 +63,35 @@ Otros comandos del backend:
 | `npm test` | Ejecuta las pruebas |
 | `npm run typecheck` | Verifica tipos sin compilar |
 | `npm run build` / `npm start` | Compila a `dist/` y ejecuta la versión compilada |
+
+Para generar `JWT_ACCESS_SECRET`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+### Autenticación
+
+Flujo de doble token:
+
+- **Access token** (JWT HS256, 15 min): se devuelve en el body y el cliente lo guarda **solo en memoria**. Se envía como `Authorization: Bearer <token>`.
+- **Refresh token** (opaco, 7 días): viaja únicamente en la cookie `refresh_token` (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/auth`). En la base de datos solo se guarda su hash SHA-256.
+- **Rotación**: cada `POST /api/auth/refresh` revoca el refresh token usado y entrega uno nuevo. Si se presenta un token ya rotado (posible robo), se revocan **todas** las sesiones del usuario.
+- **Revocación**: `POST /api/auth/logout` cierra la sesión actual; `POST /api/auth/logout-all` cierra todas.
+- **Rate limiting**: 10 intentos cada 15 min por IP en registro y login.
+
+| Endpoint | Acceso |
+|---|---|
+| `POST /api/auth/register`, `/login`, `/refresh`, `/logout` | Público |
+| `GET /api/auth/me`, `POST /api/auth/logout-all` | Autenticado |
+| `GET /api/users`, `POST /api/users`, `DELETE /api/users/:id` | Solo `admin` |
+| `GET /api/users/:id`, `PUT /api/users/:id` | El propio usuario o `admin` |
+
+Para convertir un usuario en administrador (desde DBeaver):
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'tu@email.com';
+```
 
 ### 3. Frontend
 
