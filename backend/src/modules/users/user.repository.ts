@@ -1,10 +1,12 @@
 import type { Pool } from 'pg';
+import type { Role } from '../../shared/security/roles';
 import type { User, UserWithPassword } from './user.entity';
 
 export interface NewUserData {
   name: string;
   email: string;
   passwordHash: string;
+  role: Role;
 }
 
 export interface UserChanges {
@@ -27,13 +29,14 @@ interface UserRow {
   name: string;
   email: string;
   password: string;
+  role: Role;
   created_at: Date;
 }
 
-const PUBLIC_COLUMNS = 'id, name, email, created_at';
+const PUBLIC_COLUMNS = 'id, name, email, role, created_at';
 
 function toUser(row: Omit<UserRow, 'password'>): User {
-  return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at };
+  return { id: row.id, name: row.name, email: row.email, role: row.role, createdAt: row.created_at };
 }
 
 export class PgUserRepository implements UserRepository {
@@ -65,8 +68,8 @@ export class PgUserRepository implements UserRepository {
 
   async create(data: NewUserData): Promise<User> {
     const { rows } = await this.pool.query<Omit<UserRow, 'password'>>(
-      `INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING ${PUBLIC_COLUMNS}`,
-      [data.name, data.email, data.passwordHash],
+      `INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING ${PUBLIC_COLUMNS}`,
+      [data.name, data.email, data.passwordHash, data.role],
     );
     const row = rows[0];
     if (!row) throw new Error('INSERT de usuario no devolvió filas');
