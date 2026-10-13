@@ -5,6 +5,10 @@ import swaggerUi from 'swagger-ui-express';
 import { createSwaggerSpec } from './config/swagger';
 import { AuthController } from './modules/auth/auth.controller';
 import { createAuthRouter } from './modules/auth/auth.routes';
+import { ContactController } from './modules/contacts/contact.controller';
+import { PgContactRepository } from './modules/contacts/contact.repository';
+import { createContactRouter } from './modules/contacts/contact.routes';
+import { ContactService } from './modules/contacts/contact.service';
 import { AuthService } from './modules/auth/auth.service';
 import { PgRefreshTokenRepository } from './modules/auth/refreshToken.repository';
 import { UserController } from './modules/users/user.controller';
@@ -12,6 +16,7 @@ import { PgUserRepository } from './modules/users/user.repository';
 import { createUserRouter } from './modules/users/user.routes';
 import { UserService } from './modules/users/user.service';
 import { createAuthenticate } from './shared/middlewares/authenticate';
+import { requireOwnership } from './shared/middlewares/authorize';
 import { errorHandler, notFoundHandler } from './shared/middlewares/errorHandler';
 import { JwtAccessTokenService } from './shared/security/accessToken';
 import { BcryptPasswordHasher } from './shared/security/passwordHasher';
@@ -61,12 +66,18 @@ export function createApp({ pool, config }: AppDependencies): Express {
   );
   const authController = new AuthController(authService, { cookieSecure: config.cookieSecure });
 
+  // Contactos
+  const contactService = new ContactService(new PgContactRepository(pool));
+  const contactController = new ContactController(contactService);
+  const requireContactOwner = requireOwnership((id) => contactService.findOwnerId(id));
+
   app.get('/', (_req, res) => {
     res.json({ message: 'API corriendo', docs: '/api-docs' });
   });
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(createSwaggerSpec(config.port)));
   app.use('/api/auth', createAuthRouter(authController, authenticate));
   app.use('/api/users', createUserRouter(userController, authenticate));
+  app.use('/api/contacts', createContactRouter(contactController, authenticate, requireContactOwner));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -5,8 +5,16 @@ import type {
   RefreshTokenRepository,
   RotationResult,
 } from '../../src/modules/auth/refreshToken.repository';
+import type { Contact, ScoredContact } from '../../src/modules/contacts/contact.entity';
+import type {
+  ContactRecord,
+  ContactRepository,
+  ContactSearchCriteria,
+  ContactUpdateResult,
+} from '../../src/modules/contacts/contact.repository';
 import type { User, UserWithPassword } from '../../src/modules/users/user.entity';
 import type { NewUserData, UserChanges, UserRepository } from '../../src/modules/users/user.repository';
+import { pageOffset, type Page, type PageRequest } from '../../src/shared/http/pagination';
 import type { PasswordHasher } from '../../src/shared/security/passwordHasher';
 
 // Dobles de prueba: implementan los mismos contratos que los repositorios de PostgreSQL.
@@ -101,6 +109,110 @@ export class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
 
   activeFor(userId: number): StoredRefreshToken[] {
     return this.tokens.filter((t) => t.userId === userId && !t.revokedAt);
+  }
+}
+
+interface StoredContact extends Contact, ContactRecord {
+  deletedAt: Date | null;
+}
+
+// La búsqueda difusa real (trigramas) vive en PostgreSQL; aquí se simula con coincidencia
+// por subcadena, suficiente para probar las reglas del servicio.
+export class InMemoryContactRepository implements ContactRepository {
+  readonly rows: StoredContact[] = [];
+  private nextId = 1;
+
+  private static toPublic(row: StoredContact): Contact {
+    return {
+      id: row.id,
+      ownerId: row.ownerId,
+      fullName: row.fullName,
+      email: row.email,
+      phone: row.phone,
+      company: row.company,
+      notes: row.notes,
+      version: row.version,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  private active(ownerId: number): StoredContact[] {
+    return this.rows
+      .filter((c) => c.ownerId === ownerId && !c.deletedAt)
+      .sort((a, b) => a.normalizedName.localeCompare(b.normalizedName) || a.id - b.id);
+  }
+
+  private find(ownerId: number, id: number): StoredContact | undefined {
+    return this.active(ownerId).find((c) => c.id === id);
+  }
+
+  private static paginate<T>(items: T[], page: PageRequest): Page<T> {
+    const start = pageOffset(page);
+    return { ...page, total: items.length, items: items.slice(start, start + page.pageSize) };
+  }
+
+  async findOwnerId(id: number): Promise<number | null> {
+    return this.rows.find((c) => c.id === id && !c.deletedAt)?.ownerId ?? null;
+  }
+
+  async list(ownerId: number, page: PageRequest): Promise<Page<Contact>> {
+    return InMemoryContactRepository.paginate(this.active(ownerId).map(InMemoryContactRepository.toPublic), page);
+  }
+
+  async search(ownerId: number, criteria: ContactSearchCriteria, page: PageRequest): Promise<Page<ScoredContact>> {
+    const hits = this.active(ownerId)
+      .filter(
+        (c) =>
+          (criteria.text !== '' && c.normalizedName.includes(criteria.text)) ||
+          (c.normalizedEmail ?? '').includes(criteria.email) ||
+          (criteria.phoneDigits !== null && (c.normalizedPhone ?? '').includes(criteria.phoneDigits)),
+      )
+      .map((c) => ({ ...InMemoryContactRepository.toPublic(c), score: 1 }));
+    return InMemoryContactRepository.paginate(hits, page);
+  }
+
+  async findById(ownerId: number, id: number): Promise<Contact | null> {
+    const row = this.find(ownerId, id);
+    return row ? InMemoryContactRepository.toPublic(row) : null;
+  }
+
+  async create(ownerId: number, record: ContactRecord): Promise<Contact> {
+    const now = new Date();
+    const row: StoredContact = {
+      ...record,
+      id: this.nextId++,
+      ownerId,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.rows.push(row);
+    return InMemoryContactRepository.toPublic(row);
+  }
+
+  async update(
+    ownerId: number,
+    id: number,
+    expectedVersion: number,
+    record: ContactRecord,
+  ): Promise<ContactUpdateResult> {
+    const row = this.find(ownerId, id);
+    if (!row) return { status: 'not_found' };
+    if (row.version !== expectedVersion) {
+      return { status: 'version_conflict', current: InMemoryContactRepository.toPublic(row) };
+    }
+    Object.assign(row, record, { version: row.version + 1, updatedAt: new Date() });
+    return { status: 'updated', contact: InMemoryContactRepository.toPublic(row) };
+  }
+
+  async softDelete(ownerId: number, id: number): Promise<boolean> {
+    const row = this.find(ownerId, id);
+    if (!row) return false;
+    row.deletedAt = new Date();
+    row.version += 1;
+    return true;
   }
 }
 

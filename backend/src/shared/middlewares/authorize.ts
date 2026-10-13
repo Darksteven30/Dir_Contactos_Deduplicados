@@ -1,5 +1,5 @@
 import type { Request, RequestHandler } from 'express';
-import { ForbiddenError, UnauthorizedError } from '../errors/AppError';
+import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '../errors/AppError';
 import type { AuthContext } from '../security/accessToken';
 import type { Role } from '../security/roles';
 
@@ -27,6 +27,28 @@ export function requireSelfOrAdmin(param = 'id'): RequestHandler {
     if (role !== 'admin' && req.params[param] !== String(userId)) {
       throw new ForbiddenError();
     }
+    next();
+  };
+}
+
+/** Devuelve el id del dueño de un recurso, o null si el recurso no existe. */
+export type OwnerLookup = (resourceId: number) => Promise<number | null>;
+
+/**
+ * Pertenencia de recursos que viven en la base de datos (p. ej. contactos): busca el dueño
+ * del recurso `:param` y solo deja pasar a ese usuario. Debe ir después de authenticate.
+ */
+export function requireOwnership(lookupOwner: OwnerLookup, param = 'id'): RequestHandler {
+  return async (req, _res, next) => {
+    const { userId } = requireAuth(req);
+    const resourceId = Number(req.params[param]);
+    if (!Number.isInteger(resourceId) || resourceId <= 0) {
+      throw new ValidationError('Identificador inválido');
+    }
+
+    const ownerId = await lookupOwner(resourceId);
+    if (ownerId === null) throw new NotFoundError();
+    if (ownerId !== userId) throw new ForbiddenError();
     next();
   };
 }
