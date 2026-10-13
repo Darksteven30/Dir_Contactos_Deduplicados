@@ -93,6 +93,24 @@ Para convertir un usuario en administrador (desde DBeaver):
 UPDATE users SET role = 'admin' WHERE email = 'tu@email.com';
 ```
 
+### Contactos
+
+Cada usuario administra su propio directorio: los contactos son privados (ni un `admin` puede ver los de otro usuario).
+
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/contacts?page=&pageSize=` | Listado paginado en orden alfabético |
+| `GET /api/contacts/search?q=` | Búsqueda difusa, ordenada por `score` (0 a 1) |
+| `GET /api/contacts/:id` | Consultar un contacto |
+| `POST /api/contacts` | Crear (`fullName` obligatorio; `email`, `phone`, `company`, `notes` opcionales) |
+| `PUT /api/contacts/:id` | Reemplazar; exige la `version` leída |
+| `DELETE /api/contacts/:id` | Borrado lógico |
+
+- **Pertenencia del recurso**: el middleware `requireOwnership` busca el dueño del contacto `:id` y responde 403 si es de otro usuario (404 si no existe). Además, todas las consultas del repositorio filtran por `owner_id`.
+- **Normalización**: al guardar, el backend calcula `normalized_name` (sin tildes, mayúsculas ni puntuación), `normalized_email` y `normalized_phone` (solo dígitos), para comparar contactos sin que influya el formato.
+- **Búsqueda difusa**: usa la extensión `pg_trgm` de PostgreSQL con un índice GIN. El nombre se compara por similitud de trigramas (`word_similarity`, umbral 0.6), así que tolera errores de escritura (`jose peres` encuentra a *José Pérez*). También busca fragmentos dentro del email y del teléfono; una coincidencia ahí vale score 1.
+- **Bloqueo optimista**: cada contacto tiene una columna `version`. Un `PUT` con una versión desactualizada responde **409** y en `details.current` devuelve la versión vigente para resolver el conflicto.
+
 ### 3. Frontend
 
 ```bash
