@@ -9,6 +9,10 @@ import { ContactController } from './modules/contacts/contact.controller';
 import { PgContactRepository } from './modules/contacts/contact.repository';
 import { createContactRouter } from './modules/contacts/contact.routes';
 import { ContactService } from './modules/contacts/contact.service';
+import { DeduplicationController } from './modules/deduplication/deduplication.controller';
+import { PgDeduplicationRepository } from './modules/deduplication/deduplication.repository';
+import { createDeduplicationRouter } from './modules/deduplication/deduplication.routes';
+import { DeduplicationService } from './modules/deduplication/deduplication.service';
 import { AuthService } from './modules/auth/auth.service';
 import { PgRefreshTokenRepository } from './modules/auth/refreshToken.repository';
 import { UserController } from './modules/users/user.controller';
@@ -71,12 +75,19 @@ export function createApp({ pool, config }: AppDependencies): Express {
   const contactController = new ContactController(contactService);
   const requireContactOwner = requireOwnership((id) => contactService.findOwnerId(id));
 
+  // Deduplicación
+  const deduplicationController = new DeduplicationController(
+    new DeduplicationService(new PgDeduplicationRepository(pool)),
+  );
+
   app.get('/', (_req, res) => {
     res.json({ message: 'API corriendo', docs: '/api-docs' });
   });
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(createSwaggerSpec(config.port)));
   app.use('/api/auth', createAuthRouter(authController, authenticate));
   app.use('/api/users', createUserRouter(userController, authenticate));
+  // Debe ir antes que /api/contacts: si no, "duplicates" se tomaría como el :id de un contacto.
+  app.use('/api/contacts/duplicates', createDeduplicationRouter(deduplicationController, authenticate));
   app.use('/api/contacts', createContactRouter(contactController, authenticate, requireContactOwner));
 
   app.use(notFoundHandler);
