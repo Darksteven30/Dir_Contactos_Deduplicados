@@ -1,23 +1,14 @@
 import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
 import type { Page, PageRequest } from '../../shared/http/pagination';
 import type { Contact, ContactData, ScoredContact } from './contact.entity';
-import { normalizeEmail, normalizePhone, normalizeText } from './contact.normalizer';
-import type { ContactRecord, ContactRepository } from './contact.repository';
+import { normalizeContact, normalizeText } from './contact.normalizer';
+import type { ContactRepository } from './contact.repository';
 import type { SearchContactsQuery, UpdateContactDto } from './contact.schemas';
 
 // Mínimo de dígitos para que una búsqueda también se compare contra los teléfonos.
 const MIN_PHONE_SEARCH_DIGITS = 3;
 
 const CONTACT_NOT_FOUND = 'Contacto no encontrado';
-
-function toRecord(data: ContactData): ContactRecord {
-  return {
-    ...data,
-    normalizedName: normalizeText(data.fullName),
-    normalizedEmail: normalizeEmail(data.email),
-    normalizedPhone: normalizePhone(data.phone),
-  };
-}
 
 // Reglas de negocio de contactos. Cada operación recibe el id del dueño (usuario autenticado).
 export class ContactService {
@@ -52,11 +43,11 @@ export class ContactService {
   }
 
   create(ownerId: number, data: ContactData): Promise<Contact> {
-    return this.contacts.create(ownerId, toRecord(data));
+    return this.contacts.create(ownerId, normalizeContact(data));
   }
 
   async update(ownerId: number, id: number, { version, ...data }: UpdateContactDto): Promise<Contact> {
-    const result = await this.contacts.update(ownerId, id, version, toRecord(data));
+    const result = await this.contacts.update(ownerId, id, version, normalizeContact(data));
 
     switch (result.status) {
       case 'updated':
