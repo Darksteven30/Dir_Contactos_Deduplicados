@@ -1,3 +1,6 @@
+import type { ContactData } from './contact.entity';
+import type { ContactRecord } from './contact.repository';
+
 /**
  * Normalización para comparar contactos: elimina diferencias de formato que no cambian la
  * identidad (mayúsculas, tildes, puntuación, espacios repetidos, formato del teléfono).
@@ -21,4 +24,14 @@ export function normalizeEmail(email: string | null): string | null {
 export function normalizePhone(phone: string | null): string | null {
   const digits = phone?.replace(/\D/g, '');
   return digits ? digits : null;
+}
+
+/** Datos del contacto más sus copias normalizadas, listos para persistir o comparar. */
+export function normalizeContact(data: ContactData): ContactRecord {
+  return {
+    ...data,
+    normalizedName: normalizeText(data.fullName),
+    normalizedEmail: normalizeEmail(data.email),
+    normalizedPhone: normalizePhone(data.phone),
+  };
 }

@@ -39,7 +39,7 @@ export interface ContactRepository {
   softDelete(ownerId: number, id: number): Promise<boolean>;
 }
 
-interface ContactRow {
+export interface ContactRow {
   id: number;
   owner_id: number;
   full_name: string;
@@ -52,14 +52,14 @@ interface ContactRow {
   updated_at: Date;
 }
 
-const COLUMNS = 'id, owner_id, full_name, email, phone, company, notes, version, created_at, updated_at';
+export const CONTACT_COLUMNS = 'id, owner_id, full_name, email, phone, company, notes, version, created_at, updated_at';
 
 // Filtro de búsqueda: nombre parecido (trigramas, usa el índice GIN) o fragmento de email/teléfono.
 // `$2 <% normalized_name` es verdadero si word_similarity supera pg_trgm.word_similarity_threshold (0.6).
 const SEARCH_FILTER = `owner_id = $1 AND deleted_at IS NULL
   AND ($2 <% normalized_name OR normalized_email LIKE $3 OR normalized_phone LIKE $4)`;
 
-function toContact(row: ContactRow): Contact {
+export function toContact(row: ContactRow): Contact {
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -110,7 +110,7 @@ export class PgContactRepository implements ContactRepository {
         [ownerId],
       ),
       this.pool.query<ContactRow>(
-        `SELECT ${COLUMNS} FROM contacts
+        `SELECT ${CONTACT_COLUMNS} FROM contacts
           WHERE owner_id = $1 AND deleted_at IS NULL
           ORDER BY normalized_name, id
           LIMIT $2 OFFSET $3`,
@@ -132,7 +132,7 @@ export class PgContactRepository implements ContactRepository {
       this.pool.query<{ total: string }>(`SELECT COUNT(*) AS total FROM contacts WHERE ${SEARCH_FILTER}`, params),
       // Coincidir por email o teléfono cuenta como coincidencia total (score 1).
       this.pool.query<ContactRow & { score: number }>(
-        `SELECT ${COLUMNS},
+        `SELECT ${CONTACT_COLUMNS},
                 GREATEST(
                   word_similarity($2, normalized_name),
                   CASE WHEN normalized_email LIKE $3 OR normalized_phone LIKE $4 THEN 1 ELSE 0 END
@@ -154,7 +154,7 @@ export class PgContactRepository implements ContactRepository {
 
   async findById(ownerId: number, id: number): Promise<Contact | null> {
     const { rows } = await this.pool.query<ContactRow>(
-      `SELECT ${COLUMNS} FROM contacts WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
+      `SELECT ${CONTACT_COLUMNS} FROM contacts WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
       [id, ownerId],
     );
     return rows[0] ? toContact(rows[0]) : null;
@@ -165,7 +165,7 @@ export class PgContactRepository implements ContactRepository {
       `INSERT INTO contacts
          (full_name, email, phone, company, notes, normalized_name, normalized_email, normalized_phone, owner_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING ${COLUMNS}`,
+       RETURNING ${CONTACT_COLUMNS}`,
       [...recordParams(record), ownerId],
     );
     const row = rows[0];
@@ -187,7 +187,7 @@ export class PgContactRepository implements ContactRepository {
               normalized_name = $6, normalized_email = $7, normalized_phone = $8,
               version = version + 1, updated_at = NOW()
         WHERE id = $9 AND owner_id = $10 AND version = $11 AND deleted_at IS NULL
-        RETURNING ${COLUMNS}`,
+        RETURNING ${CONTACT_COLUMNS}`,
       [...recordParams(record), id, ownerId, expectedVersion],
     );
     if (rows[0]) return { status: 'updated', contact: toContact(rows[0]) };
