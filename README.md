@@ -60,6 +60,7 @@ Otros comandos del backend:
 | Comando | Descripción |
 |---|---|
 | `npm run migrate` | Aplica solo las migraciones pendientes |
+| `npm run seed` | Carga los datos de prueba (ver abajo) |
 | `npm test` | Ejecuta las pruebas |
 | `npm run typecheck` | Verifica tipos sin compilar |
 | `npm run build` / `npm start` | Compila a `dist/` y ejecuta la versión compilada |
@@ -69,6 +70,19 @@ Para generar `JWT_ACCESS_SECRET`:
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
+
+### Datos de prueba
+
+`npm run seed` aplica las migraciones pendientes y crea dos usuarios (contraseña `demo12345`):
+
+| Usuario | Contactos |
+|---|---|
+| `demo@example.com` | 26 contactos: 8 escenarios de duplicados y 8 contactos únicos |
+| `otro@example.com` | 2 contactos, uno igual a un contacto del demo, para comprobar que los directorios son privados |
+
+Los escenarios están en [`demoData.ts`](backend/src/database/seeds/demoData.ts): tildes y mayúsculas, nombres en orden invertido, errores de escritura, mismo email con otro nombre, mismo teléfono con y sin indicativo, agrupación transitiva, apellido omitido y un falso positivo para probar "no son duplicados". También hay trampas que **no** deben agruparse (por ejemplo, *Andrea Mejía* y *Andrés Mejía*, que tienen email y teléfono distintos). Una prueba automática verifica que la deduplicación encuentre exactamente esos 8 grupos.
+
+El comando es repetible: vuelve a dejar los contactos de esos dos usuarios tal como están en el archivo. No se ejecuta con `NODE_ENV=production`.
 
 ### Autenticación
 
