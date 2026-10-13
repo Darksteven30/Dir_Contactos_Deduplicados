@@ -12,6 +12,12 @@ import type {
   ContactSearchCriteria,
   ContactUpdateResult,
 } from '../../src/modules/contacts/contact.repository';
+import type {
+  CandidatePairs,
+  ComparableContact,
+  DeduplicationRepository,
+} from '../../src/modules/deduplication/deduplication.repository';
+import type { NormalizedContactFields } from '../../src/modules/contacts/contact.repository';
 import type { User, UserWithPassword } from '../../src/modules/users/user.entity';
 import type { NewUserData, UserChanges, UserRepository } from '../../src/modules/users/user.repository';
 import { pageOffset, type Page, type PageRequest } from '../../src/shared/http/pagination';
@@ -213,6 +219,43 @@ export class InMemoryContactRepository implements ContactRepository {
     row.deletedAt = new Date();
     row.version += 1;
     return true;
+  }
+}
+
+// El blocking real (trigramas) vive en PostgreSQL; aquí todos los pares son candidatos,
+// así el servicio decide solo con el puntaje.
+export class InMemoryDeduplicationRepository implements DeduplicationRepository {
+  readonly dismissed = new Set<string>();
+
+  constructor(private readonly contacts: InMemoryContactRepository) {}
+
+  private activeOf(ownerId: number): ComparableContact[] {
+    return this.contacts.rows
+      .filter((c) => c.ownerId === ownerId && !c.deletedAt)
+      .map(({ deletedAt: _deletedAt, ...contact }) => contact);
+  }
+
+  async findCandidatePairs(ownerId: number): Promise<CandidatePairs> {
+    const contacts = this.activeOf(ownerId);
+    const pairs: Array<[number, number]> = [];
+    for (const a of contacts) {
+      for (const b of contacts) {
+        if (a.id < b.id && !this.dismissed.has(`${a.id}-${b.id}`)) pairs.push([a.id, b.id]);
+      }
+    }
+    return { contacts, pairs };
+  }
+
+  async findCandidatesFor(ownerId: number, _fields: NormalizedContactFields): Promise<ComparableContact[]> {
+    return this.activeOf(ownerId);
+  }
+
+  async countOwned(ownerId: number, ids: number[]): Promise<number> {
+    return this.activeOf(ownerId).filter((c) => ids.includes(c.id)).length;
+  }
+
+  async dismissPair(contactAId: number, contactBId: number): Promise<void> {
+    this.dismissed.add(`${contactAId}-${contactBId}`);
   }
 }
 
