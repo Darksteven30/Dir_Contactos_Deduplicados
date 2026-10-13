@@ -111,6 +111,24 @@ Cada usuario administra su propio directorio: los contactos son privados (ni un 
 - **Búsqueda difusa**: usa la extensión `pg_trgm` de PostgreSQL con un índice GIN. El nombre se compara por similitud de trigramas (`word_similarity`, umbral 0.6), así que tolera errores de escritura (`jose peres` encuentra a *José Pérez*). También busca fragmentos dentro del email y del teléfono; una coincidencia ahí vale score 1.
 - **Bloqueo optimista**: cada contacto tiene una columna `version`. Un `PUT` con una versión desactualizada responde **409** y en `details.current` devuelve la versión vigente para resolver el conflicto.
 
+### Deduplicación
+
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/contacts/duplicates?minScore=0.8` | Grupos de contactos posiblemente duplicados |
+| `POST /api/contacts/duplicates/check` | Contactos parecidos a uno que se va a crear (no guarda nada) |
+| `POST /api/contacts/duplicates/dismissals` | Marcar un par como "no son duplicados" (`{ "contactIds": [3, 7] }`) |
+
+La detección funciona en dos fases:
+
+1. **Candidatos (PostgreSQL)**: en vez de comparar todos los contactos contra todos (O(n²)), un self-join devuelve solo los pares con alguna señal de parecido: nombre similar por trigramas (operador `%` de `pg_trgm`, umbral 0.3, usa el índice GIN), mismo email o mismo teléfono (últimos 10 dígitos, para ignorar el indicativo). Se excluyen los pares descartados por el usuario.
+2. **Puntaje (TypeScript)**: cada par se califica de 0 a 1 en [`contactSimilarity.ts`](backend/src/modules/deduplication/contactSimilarity.ts):
+   - **Nombre** con distancia de **Levenshtein** propia ([`levenshtein.ts`](backend/src/shared/algorithms/levenshtein.ts)), tomando la mejor de tres comparaciones: nombre completo, palabras ordenadas (*Pérez José* = *José Pérez*) y palabra por palabra (tolera un apellido omitido).
+   - **Promedio ponderado**: nombre 0.5, email 0.3, teléfono 0.2. Solo cuentan los campos que ambos contactos tienen.
+   - **Pisos**: un email idéntico asegura un score de al menos 0.85 y un teléfono idéntico, de al menos 0.8.
+
+Los pares con `score >= minScore` (0.8 por defecto) se agrupan con **Union-Find** ([`unionFind.ts`](backend/src/shared/algorithms/unionFind.ts)): si A≈B y B≈C, los tres quedan en un grupo. Cada grupo trae el detalle de cada par (`nameSimilarity`, `emailMatch`, `phoneMatch`) y un `suggestedPrimaryId`: el contacto más completo, que será el principal al fusionar.
+
 ### 3. Frontend
 
 ```bash
