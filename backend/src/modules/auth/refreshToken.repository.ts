@@ -27,6 +27,8 @@ export interface RefreshTokenRepository {
   rotate(presentedHash: string, next: NextRefreshToken, now: Date): Promise<RotationResult>;
   revokeFamilyOf(tokenHash: string, now: Date): Promise<void>;
   revokeAllForUser(userId: number, now: Date, reason: BulkRevokeReason): Promise<void>;
+  /** Borra los tokens que vencieron antes de `before`. Devuelve cuántos borró. */
+  deleteExpiredBefore(before: Date): Promise<number>;
 }
 
 interface RefreshTokenRow {
@@ -105,5 +107,10 @@ export class PgRefreshTokenRepository implements RefreshTokenRepository {
         WHERE user_id = $2 AND revoked_at IS NULL`,
       [now, userId, reason],
     );
+  }
+
+  async deleteExpiredBefore(before: Date): Promise<number> {
+    const { rowCount } = await this.pool.query('DELETE FROM refresh_tokens WHERE expires_at < $1', [before]);
+    return rowCount ?? 0;
   }
 }
