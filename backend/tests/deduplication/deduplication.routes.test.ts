@@ -9,9 +9,9 @@ import { createDeduplicationRouter } from '../../src/modules/deduplication/dedup
 import { DeduplicationService } from '../../src/modules/deduplication/deduplication.service';
 import { createAuthenticate } from '../../src/shared/middlewares/authenticate';
 import { requireOwnership } from '../../src/shared/middlewares/authorize';
-import { errorHandler } from '../../src/shared/middlewares/errorHandler';
+import { createErrorHandler } from '../../src/shared/middlewares/errorHandler';
 import { JwtAccessTokenService } from '../../src/shared/security/accessToken';
-import { InMemoryContactRepository, InMemoryDeduplicationRepository } from '../support/inMemoryRepositories';
+import { InMemoryContactRepository, InMemoryDeduplicationRepository, silentLogger } from '../support/inMemoryRepositories';
 
 const tokens = new JwtAccessTokenService('secreto-de-pruebas-con-al-menos-32-caracteres', 900);
 const ANA = `Bearer ${tokens.sign({ userId: 1, role: 'user' })}`;
@@ -43,7 +43,7 @@ describe('Rutas /api/contacts/duplicates', () => {
         requireOwnership((id) => contacts.findOwnerId(id)),
       ),
     );
-    app.use(errorHandler);
+    app.use(createErrorHandler(silentLogger));
   });
 
   const createAs = (auth: string, fullName: string) =>
