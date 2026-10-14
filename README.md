@@ -141,7 +141,35 @@ La detección funciona en dos fases:
    - **Promedio ponderado**: nombre 0.5, email 0.3, teléfono 0.2. Solo cuentan los campos que ambos contactos tienen.
    - **Pisos**: un email idéntico asegura un score de al menos 0.85 y un teléfono idéntico, de al menos 0.8.
 
-Los pares con `score >= minScore` (0.8 por defecto) se agrupan con **Union-Find** ([`unionFind.ts`](backend/src/shared/algorithms/unionFind.ts)): si A≈B y B≈C, los tres quedan en un grupo. Cada grupo trae el detalle de cada par (`nameSimilarity`, `emailMatch`, `phoneMatch`) y un `suggestedPrimaryId`: el contacto más completo, que será el principal al fusionar.
+Los pares con `score >= minScore` (0.8 por defecto) se agrupan con **Union-Find** ([`unionFind.ts`](backend/src/shared/algorithms/unionFind.ts)): si A≈B y B≈C, los tres quedan en un grupo. Cada grupo trae el detalle de cada par (`nameSimilarity`, `emailMatch`, `phoneMatch`), un `suggestedPrimaryId` (el contacto más completo, que será el principal al fusionar) y un `mergePreview` con el resultado de la fusión sugerida.
+
+### Fusión de contactos
+
+| Endpoint | Descripción |
+|---|---|
+| `POST /api/contacts/duplicates/merges` | Fusionar duplicados en un contacto principal |
+| `GET /api/contacts/duplicates/merges?page=&pageSize=` | Historial de fusiones, de la más reciente a la más antigua |
+| `POST /api/contacts/duplicates/merges/:id/undo` | Deshacer una fusión |
+
+Cuerpo de la fusión (cada contacto con la `version` que leyó el cliente):
+
+```json
+{
+  "primary": { "id": 3, "version": 1 },
+  "duplicates": [{ "id": 7, "version": 2 }],
+  "contact": { "fullName": "José Pérez", "email": "jose@gmail.com" }
+}
+```
+
+`contact` es opcional. Si se omite, los datos se combinan automáticamente ([`contactMerge.ts`](backend/src/modules/deduplication/contactMerge.ts)): se conservan el nombre y los datos del principal, sus campos vacíos se completan con los de los duplicados, las notas se juntan y los valores distintos que no se eligieron (por ejemplo, un segundo email) se anotan en las notas, para no perder información.
+
+La fusión es **una sola transacción ACID**:
+
+1. `SELECT ... FOR UPDATE` bloquea el principal y los duplicados, siempre en orden de `id` para evitar deadlocks. Dos fusiones simultáneas sobre los mismos contactos se ejecutan una tras otra, y la segunda responde 404 porque los duplicados ya no existen.
+2. **Bloqueo optimista**: si la `version` de algún contacto no coincide con la enviada, responde **409** con las versiones vigentes en `details.current`, y no modifica nada.
+3. Actualiza el principal, hace borrado lógico de los duplicados y guarda en `contact_merges` una foto de todos los contactos tal como estaban.
+
+**Deshacer** restaura esa foto en otra transacción. Solo se permite si el principal no se editó después de la fusión (se compara su `version`); si cambió, responde 409 para no borrar esos cambios.
 
 ### 3. Frontend
 

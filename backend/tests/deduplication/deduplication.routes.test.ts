@@ -117,4 +117,60 @@ describe('Rutas /api/contacts/duplicates', () => {
       .send({ contactIds: [1, 1] })
       .expect(400);
   });
+
+  describe('fusiones', () => {
+    const mergeAs = (auth: string, body: object) =>
+      request(app).post('/api/contacts/duplicates/merges').set('Authorization', auth).send(body);
+    const pairBody = { primary: { id: 1, version: 1 }, duplicates: [{ id: 2, version: 1 }] };
+
+    beforeEach(async () => {
+      await createAs(ANA, 'José Pérez');
+      await createAs(ANA, 'Jose Peres');
+    });
+
+    it('fusiona, aparece en el historial y se puede deshacer', async () => {
+      const merged = await mergeAs(ANA, pairBody).expect(201);
+      expect(merged.body.data.contact).toMatchObject({ id: 1, version: 2 });
+      expect(merged.body.data.merge).toMatchObject({ id: 1, primaryContactId: 1, mergedContactIds: [2] });
+
+      await request(app).get('/api/contacts/2').set('Authorization', ANA).expect(404);
+
+      const history = await request(app).get('/api/contacts/duplicates/merges').set('Authorization', ANA).expect(200);
+      expect(history.body.data).toMatchObject({ total: 1, items: [{ id: 1, undoneAt: null }] });
+
+      const undone = await request(app)
+        .post('/api/contacts/duplicates/merges/1/undo')
+        .set('Authorization', ANA)
+        .expect(200);
+      expect(undone.body.data.map((c: { id: number }) => c.id)).toEqual([1, 2]);
+      await request(app).get('/api/contacts/2').set('Authorization', ANA).expect(200);
+    });
+
+    it('valida que los contactos sean distintos y que haya al menos un duplicado', async () => {
+      await mergeAs(ANA, { primary: { id: 1, version: 1 }, duplicates: [{ id: 1, version: 1 }] }).expect(400);
+      await mergeAs(ANA, { primary: { id: 1, version: 1 }, duplicates: [] }).expect(400);
+    });
+
+    it('responde 409 con las versiones vigentes si la versión enviada está desactualizada', async () => {
+      const res = await mergeAs(ANA, { primary: { id: 1, version: 7 }, duplicates: [{ id: 2, version: 1 }] }).expect(
+        409,
+      );
+      expect(res.body.details.current).toHaveLength(2);
+    });
+
+    it('no deja fusionar, ver el historial ni deshacer fusiones de otro usuario', async () => {
+      await mergeAs(BETO, pairBody).expect(404);
+      await mergeAs(ANA, pairBody).expect(201);
+
+      const history = await request(app).get('/api/contacts/duplicates/merges').set('Authorization', BETO).expect(200);
+      expect(history.body.data.total).toBe(0);
+      await request(app).post('/api/contacts/duplicates/merges/1/undo').set('Authorization', BETO).expect(404);
+    });
+
+    it('responde 409 al deshacer dos veces la misma fusión', async () => {
+      await mergeAs(ANA, pairBody).expect(201);
+      await request(app).post('/api/contacts/duplicates/merges/1/undo').set('Authorization', ANA).expect(200);
+      await request(app).post('/api/contacts/duplicates/merges/1/undo').set('Authorization', ANA).expect(409);
+    });
+  });
 });
