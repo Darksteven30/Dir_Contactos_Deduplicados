@@ -167,4 +167,19 @@ describe('AuthService', () => {
       await expect(service.refresh(phone.refreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
   });
+
+  describe('purgeExpiredSessions', () => {
+    it('borra solo los tokens vencidos hace más de un día', async () => {
+      await service.register(ANA); // vence el 8 de enero
+      now = new Date('2026-01-05T00:00:00Z');
+      await service.login({ email: ANA.email, password: ANA.password }); // vence el 12 de enero
+
+      now = new Date('2026-01-08T12:00:00Z'); // el primero venció hace 12 horas: se conserva
+      expect(await service.purgeExpiredSessions()).toBe(0);
+
+      now = new Date('2026-01-09T12:00:00Z'); // ya pasó más de un día
+      expect(await service.purgeExpiredSessions()).toBe(1);
+      expect(refreshTokens.tokens).toHaveLength(1);
+    });
+  });
 });
