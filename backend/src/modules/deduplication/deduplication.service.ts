@@ -1,10 +1,19 @@
 import { UnionFind } from '../../shared/algorithms/unionFind';
-import { NotFoundError } from '../../shared/errors/AppError';
+import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
+import type { Page, PageRequest } from '../../shared/http/pagination';
 import type { Contact, ContactData } from '../contacts/contact.entity';
 import { normalizeContact } from '../contacts/contact.normalizer';
+import { combineContacts } from './contactMerge';
 import { compareContacts } from './contactSimilarity';
-import type { DuplicateGroup, DuplicatePair, SimilarContact } from './deduplication.entity';
+import type {
+  ContactMerge,
+  DuplicateGroup,
+  DuplicatePair,
+  MergeResult,
+  SimilarContact,
+} from './deduplication.entity';
 import type { ComparableContact, DeduplicationRepository } from './deduplication.repository';
+import type { MergeContactsDto } from './deduplication.schemas';
 
 function toPublic({
   normalizedName: _name,
@@ -20,13 +29,16 @@ function completeness(contact: Contact): number {
   return [contact.email, contact.phone, contact.company, contact.notes].filter((value) => value !== null).length;
 }
 
-function suggestPrimary(contacts: Contact[]): number {
-  const [primary] = [...contacts].sort(
+// Orden sugerido para fusionar: el primero es el principal (el más completo, y el más antiguo si empatan).
+function rankForMerge(contacts: Contact[]): { primary: Contact; duplicates: Contact[] } {
+  const [primary, ...duplicates] = [...contacts].sort(
     (a, b) => completeness(b) - completeness(a) || a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
   );
   if (!primary) throw new Error('Un grupo de duplicados no puede estar vacío');
-  return primary.id;
+  return { primary, duplicates };
 }
+
+const CONTACTS_NOT_FOUND = 'Algún contacto no existe, ya fue eliminado o fusionado';
 
 /**
  * Detección de duplicados en dos fases:
@@ -65,9 +77,11 @@ export class DeduplicationService {
         const groupPairs = matches
           .filter((pair) => ids.includes(pair.contactIds[0]))
           .sort((x, y) => y.score - x.score);
+        const { primary, duplicates } = rankForMerge(members);
         return {
           score: Math.max(...groupPairs.map((pair) => pair.score)),
-          suggestedPrimaryId: suggestPrimary(members),
+          suggestedPrimaryId: primary.id,
+          mergePreview: combineContacts(primary, duplicates),
           contacts: members,
           pairs: groupPairs,
         };
@@ -92,5 +106,48 @@ export class DeduplicationService {
       throw new NotFoundError('Contacto no encontrado');
     }
     await this.repository.dismissPair(Math.min(first, second), Math.max(first, second));
+  }
+
+  /**
+   * Fusiona duplicados en un contacto principal. Los datos finales son los que eligió el usuario
+   * o, si no envió ninguno, la combinación automática de los contactos tal como están en la base.
+   */
+  async merge(ownerId: number, { primary, duplicates, contact }: MergeContactsDto): Promise<MergeResult> {
+    const outcome = await this.repository.merge(ownerId, primary, duplicates, (current, others) =>
+      normalizeContact(contact ?? combineContacts(current, others)),
+    );
+
+    switch (outcome.status) {
+      case 'merged':
+        return { merge: outcome.merge, contact: outcome.contact };
+      case 'version_conflict':
+        throw new ConflictError('Algún contacto fue modificado por otra sesión. Revisa los cambios e intenta de nuevo', {
+          current: outcome.current,
+        });
+      case 'not_found':
+        throw new NotFoundError(CONTACTS_NOT_FOUND);
+    }
+  }
+
+  listMerges(ownerId: number, page: PageRequest): Promise<Page<ContactMerge>> {
+    return this.repository.listMerges(ownerId, page);
+  }
+
+  async undoMerge(ownerId: number, mergeId: number): Promise<Contact[]> {
+    const outcome = await this.repository.undoMerge(ownerId, mergeId);
+
+    switch (outcome.status) {
+      case 'undone':
+        return outcome.contacts;
+      case 'not_found':
+        throw new NotFoundError('Fusión no encontrada');
+      case 'already_undone':
+        throw new ConflictError('La fusión ya fue deshecha');
+      case 'primary_changed':
+        throw new ConflictError(
+          'El contacto principal cambió después de la fusión; deshacerla borraría esos cambios',
+          { current: outcome.current },
+        );
+    }
   }
 }
