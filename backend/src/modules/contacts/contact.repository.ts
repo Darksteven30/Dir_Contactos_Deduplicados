@@ -79,7 +79,8 @@ function containsPattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
 }
 
-function recordParams(record: ContactRecord): unknown[] {
+// Valores para $1..$8 en este orden: full_name, email, phone, company, notes y las tres normalizadas.
+export function recordParams(record: ContactRecord): unknown[] {
   return [
     record.fullName,
     record.email,
