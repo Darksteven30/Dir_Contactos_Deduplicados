@@ -171,6 +171,19 @@ La fusión es **una sola transacción ACID**:
 
 **Deshacer** restaura esa foto en otra transacción. Solo se permite si el principal no se editó después de la fusión (se compara su `version`); si cambió, responde 409 para no borrar esos cambios.
 
+### Resiliencia y observabilidad
+
+- **Correlation id**: cada petición recibe un id en el header `x-correlation-id`. Si el cliente envía uno válido, se reutiliza; si no, se genera. Se devuelve en la respuesta y en el cuerpo de los errores (`correlationId`), para que un fallo reportado se encuentre en los logs.
+- **Logs estructurados** con [pino](https://getpino.io): una línea JSON por evento, con nivel, hora, `correlationId` y datos del evento. Gracias a `AsyncLocalStorage`, cualquier log emitido durante una petición o un trabajo lleva su id sin pasarlo a mano. Cada petición registra método, ruta, código y duración (`info` si va bien, `warn` en 4xx, `error` en 5xx). En desarrollo se ven legibles y con colores, y los tokens y contraseñas nunca se escriben.
+- **Manejo global de excepciones**: los errores inesperados se registran con su stack, y al cliente solo le llega un 500 genérico con el `correlationId`.
+- **Cola en memoria** ([`jobQueue.ts`](backend/src/shared/queue/jobQueue.ts)) para tareas asíncronas: concurrencia limitada, reintentos con backoff exponencial (1 s, 2 s, 4 s…) y logs de cada intento. La usa la limpieza periódica de refresh tokens vencidos (`TOKEN_CLEANUP_INTERVAL_MINUTES`, 60 por defecto).
+- **Seguridad HTTP**: `helmet` agrega los headers de seguridad (CSP, `nosniff`, protección contra clickjacking, HSTS) y oculta `X-Powered-By`.
+- **`GET /health`**: verifica la conexión con PostgreSQL (200 o 503). Lo usan las plataformas de despliegue.
+- **Apagado ordenado**: ante `SIGTERM` o `SIGINT` el servidor deja de aceptar conexiones, termina las peticiones en curso y los trabajos de la cola, y cierra el pool de PostgreSQL.
+- **Detrás de un proxy** (Render, Railway…): configurar `TRUST_PROXY=1` para que el rate limit vea la IP real de cada usuario.
+
+Variables nuevas en `.env` (ver `.env.example`): `LOG_LEVEL`, `TRUST_PROXY`, `TOKEN_CLEANUP_INTERVAL_MINUTES`. Todas tienen valor por defecto.
+
 ### 3. Frontend
 
 ```bash
