@@ -4,8 +4,9 @@ import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createAuthenticate } from '../../src/shared/middlewares/authenticate';
 import { requireRole, requireSelfOrAdmin } from '../../src/shared/middlewares/authorize';
-import { errorHandler } from '../../src/shared/middlewares/errorHandler';
+import { createErrorHandler } from '../../src/shared/middlewares/errorHandler';
 import { JwtAccessTokenService } from '../../src/shared/security/accessToken';
+import { silentLogger } from '../support/inMemoryRepositories';
 
 const SECRET = 'secreto-de-pruebas-con-al-menos-32-caracteres';
 const tokens = new JwtAccessTokenService(SECRET, 900);
@@ -24,7 +25,7 @@ describe('Middlewares de autenticación y autorización', () => {
     app.get('/users/:id', authenticate, requireSelfOrAdmin(), (req, res) => {
       res.json({ auth: req.auth });
     });
-    app.use(errorHandler);
+    app.use(createErrorHandler(silentLogger));
   });
 
   describe('authenticate', () => {

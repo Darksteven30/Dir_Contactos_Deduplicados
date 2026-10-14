@@ -27,6 +27,7 @@ import type { NormalizedContactFields } from '../../src/modules/contacts/contact
 import type { User, UserWithPassword } from '../../src/modules/users/user.entity';
 import type { NewUserData, UserChanges, UserRepository } from '../../src/modules/users/user.repository';
 import { pageOffset, type Page, type PageRequest } from '../../src/shared/http/pagination';
+import { createLogger } from '../../src/shared/logging/logger';
 import type { PasswordHasher } from '../../src/shared/security/passwordHasher';
 
 // Dobles de prueba: implementan los mismos contratos que los repositorios de PostgreSQL.
@@ -112,6 +113,13 @@ export class InMemoryRefreshTokenRepository implements RefreshTokenRepository {
     for (const t of this.tokens) {
       if (t.userId === userId && !t.revokedAt) this.revoke(t, now, reason);
     }
+  }
+
+  async deleteExpiredBefore(before: Date): Promise<number> {
+    const kept = this.tokens.filter((t) => t.expiresAt >= before);
+    const deleted = this.tokens.length - kept.length;
+    this.tokens.splice(0, this.tokens.length, ...kept);
+    return deleted;
   }
 
   private revoke(token: StoredRefreshToken, now: Date, reason: string): void {
@@ -358,6 +366,9 @@ export class InMemoryDeduplicationRepository implements DeduplicationRepository 
     };
   }
 }
+
+// Logger que no escribe nada, para que la salida de las pruebas quede limpia.
+export const silentLogger = createLogger({ level: 'silent' });
 
 export const fakeHasher: PasswordHasher = {
   hash: async (plain) => `hashed:${plain}`,

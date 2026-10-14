@@ -21,6 +21,10 @@ export interface AuthServiceOptions {
   now?: () => Date;
 }
 
+// Los tokens vencidos se conservan un día más antes de borrarlos: mientras existan, presentar
+// uno ya rotado se sigue detectando como reutilización (posible robo) y no como token inválido.
+const EXPIRED_TOKEN_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 const INVALID_CREDENTIALS = 'Email o contraseña incorrectos';
 const INVALID_SESSION = 'Sesión inválida o expirada';
 
@@ -97,6 +101,11 @@ export class AuthService {
 
   me(userId: number): Promise<User> {
     return this.userService.getById(userId);
+  }
+
+  /** Tarea de mantenimiento: borra los refresh tokens vencidos hace más de un día. */
+  purgeExpiredSessions(): Promise<number> {
+    return this.refreshTokens.deleteExpiredBefore(new Date(this.now().getTime() - EXPIRED_TOKEN_RETENTION_MS));
   }
 
   private async startSession(user: User): Promise<AuthSession> {
