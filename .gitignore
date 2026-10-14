@@ -20,3 +20,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Contexto local de Claude Code (no se versiona)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
