@@ -1,4 +1,4 @@
-import type { Contact } from '../contacts/contact.entity';
+import type { Contact, ContactData } from '../contacts/contact.entity';
 
 // Resultado de comparar dos contactos, con el detalle que explica el puntaje.
 export interface ContactMatch {
@@ -22,8 +22,33 @@ export interface DuplicateGroup {
   score: number;
   /** Contacto sugerido como principal para la fusión: el más completo (y el más antiguo si empatan). */
   suggestedPrimaryId: number;
+  /** Resultado de fusionar el grupo con el principal sugerido (combinación automática). */
+  mergePreview: ContactData;
   contacts: Contact[];
   pairs: DuplicatePair[];
+}
+
+// Contacto tal como estaba justo antes de una fusión.
+export interface MergedContactSnapshot extends ContactData {
+  id: number;
+}
+
+// Registro del historial de fusiones.
+export interface ContactMerge {
+  id: number;
+  primaryContactId: number;
+  mergedContactIds: number[];
+  /** Estado de todos los contactos (principal incluido) antes de fusionar. */
+  before: MergedContactSnapshot[];
+  createdAt: Date;
+  /** null mientras la fusión siga vigente. */
+  undoneAt: Date | null;
+}
+
+export interface MergeResult {
+  merge: ContactMerge;
+  /** Contacto principal con los datos combinados. */
+  contact: Contact;
 }
 
 // Contacto existente parecido a uno que se está por crear.
