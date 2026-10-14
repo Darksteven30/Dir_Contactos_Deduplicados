@@ -2,9 +2,8 @@ import path from 'node:path';
 import swaggerJsdoc from 'swagger-jsdoc';
 
 // Rutas de los archivos con anotaciones @swagger. Sirve tanto en desarrollo (.ts) como en build (.js).
-const routeFiles = path
-  .join(__dirname, '../modules/**/*.routes.{ts,js}')
-  .replace(/\\/g, '/');
+const toGlob = (relative: string) => path.join(__dirname, relative).replace(/\\/g, '/');
+const routeFiles = [toGlob('../modules/**/*.routes.{ts,js}'), toGlob('../shared/http/health.{ts,js}')];
 
 export function createSwaggerSpec(port: number): object {
   return swaggerJsdoc({
@@ -17,6 +16,6 @@ export function createSwaggerSpec(port: number): object {
       },
       servers: [{ url: `http://localhost:${port}`, description: 'Servidor local' }],
     },
-    apis: [routeFiles],
+    apis: routeFiles,
   });
 }
