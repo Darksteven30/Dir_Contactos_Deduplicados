@@ -12,11 +12,17 @@ import type {
   ContactSearchCriteria,
   ContactUpdateResult,
 } from '../../src/modules/contacts/contact.repository';
+import type { ContactMerge } from '../../src/modules/deduplication/deduplication.entity';
 import type {
   CandidatePairs,
   ComparableContact,
   DeduplicationRepository,
+  MergeOutcome,
+  MergeResolver,
+  StoredContactSnapshot,
+  UndoMergeOutcome,
 } from '../../src/modules/deduplication/deduplication.repository';
+import type { VersionedContactRef } from '../../src/modules/deduplication/deduplication.schemas';
 import type { NormalizedContactFields } from '../../src/modules/contacts/contact.repository';
 import type { User, UserWithPassword } from '../../src/modules/users/user.entity';
 import type { NewUserData, UserChanges, UserRepository } from '../../src/modules/users/user.repository';
@@ -256,6 +262,100 @@ export class InMemoryDeduplicationRepository implements DeduplicationRepository 
 
   async dismissPair(contactAId: number, contactBId: number): Promise<void> {
     this.dismissed.add(`${contactAId}-${contactBId}`);
+  }
+
+  // Historial de fusiones. En memoria no hay concurrencia real: la atomicidad y los bloqueos
+  // se prueban contra PostgreSQL; aquí se prueban las reglas del servicio.
+  readonly merges: Array<{
+    ownerId: number;
+    record: ContactMerge;
+    snapshot: StoredContactSnapshot[];
+    primaryVersionAfter: number;
+  }> = [];
+
+  private static publicOf({
+    deletedAt: _deletedAt,
+    normalizedName: _name,
+    normalizedEmail: _email,
+    normalizedPhone: _phone,
+    ...contact
+  }: InMemoryContactRepository['rows'][number]): Contact {
+    return contact;
+  }
+
+  private static snapshotOf(row: InMemoryContactRepository['rows'][number]): StoredContactSnapshot {
+    const { id, fullName, email, phone, company, notes, normalizedName, normalizedEmail, normalizedPhone } = row;
+    return { id, fullName, email, phone, company, notes, normalizedName, normalizedEmail, normalizedPhone };
+  }
+
+  async merge(
+    ownerId: number,
+    primary: VersionedContactRef,
+    duplicates: VersionedContactRef[],
+    resolve: MergeResolver,
+  ): Promise<MergeOutcome> {
+    const expected = [primary, ...duplicates];
+    const rows = expected.flatMap(
+      (ref) => this.contacts.rows.find((c) => c.id === ref.id && c.ownerId === ownerId && !c.deletedAt) ?? [],
+    );
+    const [primaryRow, ...duplicateRows] = rows;
+    if (!primaryRow || rows.length !== expected.length) return { status: 'not_found' };
+    if (expected.some((ref, i) => rows[i]?.version !== ref.version)) {
+      return { status: 'version_conflict', current: rows.map(InMemoryDeduplicationRepository.publicOf) };
+    }
+
+    const snapshot = rows.map(InMemoryDeduplicationRepository.snapshotOf);
+    const record = resolve(
+      InMemoryDeduplicationRepository.publicOf(primaryRow),
+      duplicateRows.map(InMemoryDeduplicationRepository.publicOf),
+    );
+    const now = new Date();
+    Object.assign(primaryRow, record, { version: primaryRow.version + 1, updatedAt: now });
+    for (const row of duplicateRows) Object.assign(row, { deletedAt: now, version: row.version + 1, updatedAt: now });
+
+    const merge: ContactMerge = {
+      id: this.merges.length + 1,
+      primaryContactId: primary.id,
+      mergedContactIds: duplicates.map((ref) => ref.id),
+      before: snapshot.map(({ normalizedName: _n, normalizedEmail: _e, normalizedPhone: _p, ...data }) => data),
+      createdAt: now,
+      undoneAt: null,
+    };
+    this.merges.push({ ownerId, record: merge, snapshot, primaryVersionAfter: primaryRow.version });
+    return { status: 'merged', merge, contact: InMemoryDeduplicationRepository.publicOf(primaryRow) };
+  }
+
+  async listMerges(ownerId: number, page: PageRequest): Promise<Page<ContactMerge>> {
+    const items = this.merges
+      .filter((m) => m.ownerId === ownerId)
+      .map((m) => m.record)
+      .reverse();
+    const start = pageOffset(page);
+    return { ...page, total: items.length, items: items.slice(start, start + page.pageSize) };
+  }
+
+  async undoMerge(ownerId: number, mergeId: number): Promise<UndoMergeOutcome> {
+    const stored = this.merges.find((m) => m.record.id === mergeId && m.ownerId === ownerId);
+    if (!stored) return { status: 'not_found' };
+    if (stored.record.undoneAt) return { status: 'already_undone' };
+
+    const { record } = stored;
+    const primary = this.contacts.rows.find((c) => c.id === record.primaryContactId && !c.deletedAt);
+    if (!primary || primary.version !== stored.primaryVersionAfter) {
+      return { status: 'primary_changed', current: primary ? InMemoryDeduplicationRepository.publicOf(primary) : null };
+    }
+
+    const now = new Date();
+    const { id: _id, ...before } = stored.snapshot.find((s) => s.id === record.primaryContactId) ?? {};
+    Object.assign(primary, before, { version: primary.version + 1, updatedAt: now });
+    const restored = this.contacts.rows.filter((c) => record.mergedContactIds.includes(c.id) && c.deletedAt);
+    for (const row of restored) Object.assign(row, { deletedAt: null, version: row.version + 1, updatedAt: now });
+    record.undoneAt = now;
+
+    return {
+      status: 'undone',
+      contacts: [primary, ...restored].sort((a, b) => a.id - b.id).map(InMemoryDeduplicationRepository.publicOf),
+    };
   }
 }
 
