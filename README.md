@@ -186,10 +186,48 @@ Variables nuevas en `.env` (ver `.env.example`): `LOG_LEVEL`, `TRUST_PROXY`, `TO
 
 ### 3. Frontend
 
+Con el backend corriendo en otra terminal:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-- App: http://localhost:5173
+- App: http://localhost:5173 (con `npm run seed`, entrar con `demo@example.com` / `demo12345`)
+- En desarrollo, Vite reenvía `/api` y `/health` al backend (`localhost:3000`). Así el navegador ve un solo origen y la cookie del refresh token funciona sin configurar CORS.
+
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run test:unit` | Pruebas (Vitest + Vue Test Utils) |
+| `npm run type-check` | Verificación de tipos (`vue-tsc`) |
+| `npm run lint` / `npm run format` | oxlint + ESLint / Prettier |
+| `npm run build` | Build de producción en `dist/` |
+
+#### Arquitectura del frontend
+
+```
+frontend/src/
+├── api/          Cliente HTTP (Axios) y funciones tipadas por recurso (auth.ts, ...)
+├── stores/       Estado global con Pinia (auth.ts, ...)
+├── router/       Rutas y navigation guards
+├── views/        Páginas (una por ruta)
+├── components/
+│   ├── base/     Componentes reutilizables: BaseButton, BaseInput, BaseCard, BaseAlert
+│   └── layout/   Encabezado y estructura de la app
+└── types/        Contratos de la API (los mismos que devuelve el backend)
+```
+
+Las vistas usan los stores; los stores usan las funciones de `src/api`; solo `src/api/http.ts` conoce Axios. Los estilos son de **Tailwind CSS** y casi todos viven en los componentes base.
+
+#### Sesión en el frontend
+
+- **Access token solo en memoria** (store `auth` de Pinia), nunca en `localStorage` ni `sessionStorage`, donde un ataque XSS podría leerlo. Al recargar la página, `restoreSession()` pide uno nuevo con la cookie HttpOnly del refresh token, que JavaScript no puede leer.
+- **Cliente HTTP con interceptores** ([`http.ts`](frontend/src/api/http.ts)):
+  - agrega `Authorization: Bearer` y un `x-correlation-id` a cada petición;
+  - ante un **401** renueva la sesión **una sola vez** (aunque fallen varias peticiones a la vez) y repite la petición original; si no se puede renovar, vuelve al login avisando que la sesión expiró;
+  - **reintenta automáticamente** las lecturas (GET) ante fallos de red o 502/503/504, con backoff exponencial. Las peticiones que modifican datos nunca se repiten solas;
+  - convierte todo error en un `ApiError` con un mensaje para el usuario y los errores por campo.
+- **Navigation guards asíncronos**: antes de la primera navegación se espera a recuperar la sesión, así recargar una página privada no manda al login a quien sí tiene sesión. Las rutas privadas sin sesión redirigen al login y recuerdan el destino; después de iniciar sesión se vuelve ahí, aceptando solo rutas internas para evitar *open redirects*.
+- **Estados de carga y error explícitos** en el store (`pending`, `error`): botones con indicador de carga, errores del servidor y validación por campo.
