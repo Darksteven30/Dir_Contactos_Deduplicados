@@ -1,23 +1,89 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import type { Pinia } from 'pinia'
+import {
+  createRouter,
+  createWebHistory,
+  type Router,
+  type RouterHistory,
+  type RouteRecordRaw,
+} from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: HomeView,
-    },
-    {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
-    },
-  ],
-})
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Solo para usuarios con sesión: sin sesión se redirige al login. */
+    requiresAuth?: boolean
+    /** Solo para visitantes (login, registro): con sesión se redirige al inicio. */
+    guestOnly?: boolean
+    title?: string
+  }
+}
 
-export default router
+const APP_NAME = 'Directorio de Contactos'
+
+export const routes: RouteRecordRaw[] = [
+  {
+    path: '/',
+    name: 'home',
+    component: () => import('@/views/HomeView.vue'),
+    meta: { requiresAuth: true, title: 'Inicio' },
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { guestOnly: true, title: 'Iniciar sesión' },
+  },
+  {
+    path: '/registro',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { guestOnly: true, title: 'Crear cuenta' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('@/views/NotFoundView.vue'),
+    meta: { title: 'Página no encontrada' },
+  },
+]
+
+export function createAppRouter(
+  history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),
+): Router {
+  return createRouter({ history, routes })
+}
+
+/**
+ * Guard asíncrono de acceso. Antes de la primera navegación espera a que se intente recuperar
+ * la sesión (refresh con la cookie HttpOnly), así una recarga en una ruta privada no manda al
+ * login a un usuario que sí tiene sesión.
+ */
+export function installAuthGuard(router: Router, pinia: Pinia): void {
+  router.beforeEach(async (to) => {
+    const auth = useAuthStore(pinia)
+    await auth.restoreSession()
+
+    if (to.meta.requiresAuth && !auth.isAuthenticated) {
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
+    if (to.meta.guestOnly && auth.isAuthenticated) {
+      return { name: 'home' }
+    }
+    return true
+  })
+
+  router.afterEach((to) => {
+    document.title = to.meta.title ? `${to.meta.title} · ${APP_NAME}` : APP_NAME
+  })
+}
+
+/**
+ * Destino seguro tras iniciar sesión: solo rutas internas. Evita que un enlace como
+ * `/login?redirect=https://sitio-malicioso.com` (open redirect) saque al usuario de la app.
+ */
+export function safeRedirect(value: unknown, fallback = '/'): string {
+  if (typeof value !== 'string') return fallback
+  const isInternalPath =
+    value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')
+  return isInternalPath ? value : fallback
+}
