@@ -36,28 +36,36 @@ describe('guards de navegación', () => {
   it('sin sesión, una ruta privada redirige al login recordando el destino', async () => {
     vi.mocked(authApi.refresh).mockRejectedValue(new ApiError('Sesión inválida', 401))
 
-    await router.push('/?tab=1')
+    await router.push('/contactos?q=ana')
 
     expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.redirect).toBe('/?tab=1')
+    expect(router.currentRoute.value.query.redirect).toBe('/contactos?q=ana')
   })
 
   it('con una sesión recuperable (recarga de página) entra a la ruta privada', async () => {
     vi.mocked(authApi.refresh).mockResolvedValue(SESSION)
 
-    await router.push('/')
+    await router.push('/cuenta')
 
-    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.currentRoute.value.name).toBe('account')
   })
 
-  it('con sesión, el login y el registro redirigen al inicio', async () => {
+  it('la raíz lleva al directorio de contactos', async () => {
+    vi.mocked(authApi.refresh).mockResolvedValue(SESSION)
+
+    await router.push('/')
+
+    expect(router.currentRoute.value.name).toBe('contacts')
+  })
+
+  it('con sesión, el login y el registro redirigen a los contactos', async () => {
     vi.mocked(authApi.refresh).mockResolvedValue(SESSION)
 
     await router.push('/login')
-    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.currentRoute.value.name).toBe('contacts')
 
     await router.push('/registro')
-    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.currentRoute.value.name).toBe('contacts')
   })
 
   it('recupera la sesión una sola vez aunque haya varias navegaciones', async () => {
