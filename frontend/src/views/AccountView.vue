@@ -30,8 +30,8 @@ async function logoutAll(): Promise<void> {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Hola, {{ auth.user?.name }}</h1>
-      <p class="mt-1 text-sm text-slate-600">Bienvenido a tu directorio de contactos.</p>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Mi cuenta</h1>
+      <p class="mt-1 text-sm text-slate-600">Tus datos y la seguridad de tus sesiones.</p>
     </div>
 
     <BaseCard>

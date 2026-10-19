@@ -4,7 +4,7 @@
     <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">Página no encontrada</h1>
     <p class="mt-2 text-sm text-slate-600">La página que buscas no existe o fue movida.</p>
     <RouterLink
-      :to="{ name: 'home' }"
+      :to="{ name: 'contacts' }"
       class="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
     >
       Volver al inicio
