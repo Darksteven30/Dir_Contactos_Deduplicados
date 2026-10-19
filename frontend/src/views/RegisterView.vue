@@ -48,7 +48,7 @@ async function submit(): Promise<void> {
     email: email.value.trim(),
     password: password.value,
   })
-  if (ok) await router.replace({ name: 'home' })
+  if (ok) await router.replace({ name: 'contacts' })
 }
 </script>
 

@@ -43,3 +43,58 @@ export interface RegisterData {
   email: string
   password: string
 }
+
+// ---- Contactos ----
+
+/** Datos que el usuario captura. Los opcionales viajan como null cuando están vacíos. */
+export interface ContactInput {
+  fullName: string
+  email: string | null
+  phone: string | null
+  company: string | null
+  notes: string | null
+}
+
+export interface Contact extends ContactInput {
+  id: number
+  ownerId: number
+  /** Versión para el bloqueo optimista: se envía al editar. */
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Resultado de la búsqueda difusa: score de 0 a 1 (1 = coincidencia total). */
+export interface ScoredContact extends Contact {
+  score: number
+}
+
+export interface PageRequest {
+  page: number
+  pageSize: number
+}
+
+export interface Page<T> extends PageRequest {
+  total: number
+  items: T[]
+}
+
+/** Detalle de por qué dos contactos parecen la misma persona. */
+export interface ContactMatch {
+  score: number
+  nameSimilarity: number
+  /** null si alguno de los dos no tiene email. */
+  emailMatch: boolean | null
+  phoneMatch: boolean | null
+}
+
+/** Contacto existente parecido a uno que se está creando. */
+export interface SimilarContact {
+  contact: Contact
+  match: ContactMatch
+}
+
+/** Cuerpo del 409 al editar: la versión vigente del contacto, para resolver el conflicto. */
+export interface ContactConflictDetails {
+  current: Contact
+}

@@ -209,13 +209,15 @@ npm run dev
 
 ```
 frontend/src/
-├── api/          Cliente HTTP (Axios) y funciones tipadas por recurso (auth.ts, ...)
-├── stores/       Estado global con Pinia (auth.ts, ...)
+├── api/          Cliente HTTP (Axios) y funciones tipadas por recurso (auth.ts, contacts.ts)
+├── stores/       Estado global con Pinia (auth.ts, contacts.ts, toasts.ts)
 ├── router/       Rutas y navigation guards
 ├── views/        Páginas (una por ruta)
 ├── components/
-│   ├── base/     Componentes reutilizables: BaseButton, BaseInput, BaseCard, BaseAlert
-│   └── layout/   Encabezado y estructura de la app
+│   ├── base/     Componentes reutilizables: botón, campos, tarjeta, alerta, modal, paginación, íconos
+│   ├── contacts/ Formulario, conflicto 409, aviso de duplicados, avatar
+│   └── layout/   Encabezado, menú y avisos (toasts)
+├── composables/  Lógica reutilizable (debounce)
 └── types/        Contratos de la API (los mismos que devuelve el backend)
 ```
 
@@ -231,3 +233,17 @@ Las vistas usan los stores; los stores usan las funciones de `src/api`; solo `sr
   - convierte todo error en un `ApiError` con un mensaje para el usuario y los errores por campo.
 - **Navigation guards asíncronos**: antes de la primera navegación se espera a recuperar la sesión, así recargar una página privada no manda al login a quien sí tiene sesión. Las rutas privadas sin sesión redirigen al login y recuerdan el destino; después de iniciar sesión se vuelve ahí, aceptando solo rutas internas para evitar *open redirects*.
 - **Estados de carga y error explícitos** en el store (`pending`, `error`): botones con indicador de carga, errores del servidor y validación por campo.
+
+#### Contactos en el frontend
+
+Pantalla `/contactos` (la raíz `/` lleva ahí). Los datos de la cuenta están en `/cuenta`.
+
+- **Store normalizado** ([`contacts.ts`](frontend/src/stores/contacts.ts)): `byId` guarda cada contacto una sola vez y `ids` el orden de la página visible. Si un contacto aparece en el listado y en una búsqueda, editarlo lo actualiza en ambos.
+- **Caché por consulta** (texto + página + tamaño) durante 30 s: volver a una página ya vista no hace otra petición. Crear, editar o borrar invalida la caché.
+- **Estados explícitos** `idle` / `loading` / `success` / `error`: esqueleto mientras carga la primera vez, lista atenuada al refrescar, error con botón *Reintentar* y estados vacíos ("Aún no tienes contactos" y "No encontramos contactos").
+- **Respuestas fuera de orden**: si el usuario escribe rápido, solo se aplica la respuesta de la última búsqueda.
+- **Búsqueda difusa** con *debounce* (300 ms). El texto y la página viven en la URL (`/contactos?q=jose&page=2`), así se puede recargar, compartir y usar atrás/adelante. Cada resultado muestra su porcentaje de parecido.
+- **Paginación** con tamaño de página elegible (10, 20 o 50). Esa preferencia es lo único que se guarda en el navegador (**persistencia selectiva**): los contactos siempre vienen del servidor.
+- **Crear y editar** en una ventana modal con validación por campo (las mismas reglas que el backend). Al crear, mientras se escribe, se consulta `POST /duplicates/check` y se avisa si ya existe un contacto parecido, con opción de editar ese en lugar de crear otro.
+- **Conflicto de edición (409)**: si otra sesión guardó el contacto antes, se muestra una tabla con las diferencias (*tu versión* frente a *versión actual*) y el usuario elige **usar la versión actual** o **guardar sus cambios** sobre la versión vigente.
+- **Borrado optimista**: el contacto desaparece de inmediato y vuelve si el servidor rechaza la operación.

@@ -12,7 +12,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     /** Solo para usuarios con sesión: sin sesión se redirige al login. */
     requiresAuth?: boolean
-    /** Solo para visitantes (login, registro): con sesión se redirige al inicio. */
+    /** Solo para visitantes (login, registro): con sesión se redirige a los contactos. */
     guestOnly?: boolean
     title?: string
   }
@@ -21,11 +21,18 @@ declare module 'vue-router' {
 const APP_NAME = 'Directorio de Contactos'
 
 export const routes: RouteRecordRaw[] = [
+  { path: '/', redirect: { name: 'contacts' } },
   {
-    path: '/',
-    name: 'home',
-    component: () => import('@/views/HomeView.vue'),
-    meta: { requiresAuth: true, title: 'Inicio' },
+    path: '/contactos',
+    name: 'contacts',
+    component: () => import('@/views/ContactsView.vue'),
+    meta: { requiresAuth: true, title: 'Contactos' },
+  },
+  {
+    path: '/cuenta',
+    name: 'account',
+    component: () => import('@/views/AccountView.vue'),
+    meta: { requiresAuth: true, title: 'Mi cuenta' },
   },
   {
     path: '/login',
@@ -67,7 +74,7 @@ export function installAuthGuard(router: Router, pinia: Pinia): void {
       return { name: 'login', query: { redirect: to.fullPath } }
     }
     if (to.meta.guestOnly && auth.isAuthenticated) {
-      return { name: 'home' }
+      return { name: 'contacts' }
     }
     return true
   })
