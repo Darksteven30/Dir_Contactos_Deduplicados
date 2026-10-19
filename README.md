@@ -39,6 +39,26 @@ Las migraciones se aplican en orden, una sola vez, y se registran en la tabla `s
 
 ## Puesta en marcha
 
+### Inicio rápido (backend y frontend juntos)
+
+Con la base de datos creada y `backend/.env` configurado (ver los pasos 1 y 2), desde la **raíz** del proyecto:
+
+```bash
+npm run install:all   # solo la primera vez: instala raíz, backend y frontend
+npm run dev           # levanta backend (3000) y frontend (5173) en una sola terminal
+```
+
+Abrir http://localhost:5173. Cada línea de la terminal sale marcada con `[back]` o `[front]`, y `Ctrl + C` detiene los dos.
+
+| Comando (en la raíz) | Descripción |
+|---|---|
+| `npm run dev` | Backend y frontend a la vez (con [concurrently](https://github.com/open-cli-tools/concurrently)) |
+| `npm run install:all` | Instala las dependencias de la raíz, el backend y el frontend |
+| `npm test` | Todas las pruebas: backend y frontend |
+| `npm run check` | Tipos del backend y del frontend, y lint del frontend |
+
+Los pasos siguientes explican cada parte por separado.
+
 ### 1. Base de datos
 
 Crear la base de datos `contactos_db` en PostgreSQL (por ejemplo desde DBeaver).
