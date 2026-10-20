@@ -1,20 +1,13 @@
 <script setup lang="ts">
 import BaseIcon from '@/components/base/BaseIcon.vue'
-import type { Contact, ContactMatch, SimilarContact } from '@/types/api'
+import type { Contact, SimilarContact } from '@/types/api'
+import { describeMatch, percent } from '@/utils/match'
 import ContactAvatar from './ContactAvatar.vue'
 
 defineProps<{ similar: SimilarContact[] }>()
 const emit = defineEmits<{ 'edit-existing': [contact: Contact] }>()
 
 const MAX_SHOWN = 3
-
-function reasons(match: ContactMatch): string {
-  const parts: string[] = []
-  if (match.emailMatch) parts.push('mismo email')
-  if (match.phoneMatch) parts.push('mismo teléfono')
-  if (match.nameSimilarity >= 0.8) parts.push('nombre parecido')
-  return parts.join(' · ')
-}
 </script>
 
 <template>
@@ -35,7 +28,7 @@ function reasons(match: ContactMatch): string {
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium text-slate-900">{{ contact.fullName }}</p>
           <p class="truncate text-xs text-slate-500">
-            {{ Math.round(match.score * 100) }}% parecido · {{ reasons(match) }}
+            {{ percent(match.score) }} parecido · {{ describeMatch(match).join(' · ') }}
           </p>
         </div>
         <button
