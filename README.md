@@ -229,15 +229,17 @@ npm run dev
 
 ```
 frontend/src/
-├── api/          Cliente HTTP (Axios) y funciones tipadas por recurso (auth.ts, contacts.ts)
-├── stores/       Estado global con Pinia (auth.ts, contacts.ts, toasts.ts)
+├── api/          Cliente HTTP (Axios) y funciones tipadas por recurso (auth, contacts, duplicates)
+├── stores/       Estado global con Pinia (auth, contacts, duplicates, toasts)
 ├── router/       Rutas y navigation guards
 ├── views/        Páginas (una por ruta)
 ├── components/
 │   ├── base/     Componentes reutilizables: botón, campos, tarjeta, alerta, modal, paginación, íconos
 │   ├── contacts/ Formulario, conflicto 409, aviso de duplicados, avatar
+│   ├── duplicates/ Tarjeta de grupo, ventana de fusión, pestañas
 │   └── layout/   Encabezado, menú y avisos (toasts)
 ├── composables/  Lógica reutilizable (debounce)
+├── utils/        Funciones puras (normalizar nombres, describir parecidos)
 └── types/        Contratos de la API (los mismos que devuelve el backend)
 ```
 
@@ -267,3 +269,17 @@ Pantalla `/contactos` (la raíz `/` lleva ahí). Los datos de la cuenta están e
 - **Crear y editar** en una ventana modal con validación por campo (las mismas reglas que el backend). Al crear, mientras se escribe, se consulta `POST /duplicates/check` y se avisa si ya existe un contacto parecido, con opción de editar ese en lugar de crear otro.
 - **Conflicto de edición (409)**: si otra sesión guardó el contacto antes, se muestra una tabla con las diferencias (*tu versión* frente a *versión actual*) y el usuario elige **usar la versión actual** o **guardar sus cambios** sobre la versión vigente.
 - **Borrado optimista**: el contacto desaparece de inmediato y vuelve si el servidor rechaza la operación.
+
+#### Duplicados y fusión en el frontend
+
+Pantalla `/duplicados` (en el menú: *Duplicados*), con dos pestañas: *Por revisar* e *Historial de fusiones* (`/duplicados/historial`).
+
+- **Grupos lado a lado**: cada grupo muestra sus contactos en columnas para compararlos, el **principal sugerido** (el más completo), una etiqueta de confianza (*Muy probable*, *Probable* o *Posible*, con su porcentaje) y **por qué se parecen**, par por par (por ejemplo: "nombre 93 % parecido · mismo teléfono").
+- **Sensibilidad** *Estricta* (0.9), *Normal* (0.8) o *Amplia* (0.7): cambia el `minScore` de la detección y se recuerda en el navegador.
+- **"No son duplicados"** descarta todos los pares del grupo, que desaparece al instante y vuelve si el servidor falla. En grupos de tres o más, **"No es la misma persona"** saca a un solo contacto descartando solo sus pares; el servidor vuelve a calcular el resto del grupo.
+- **Fusionar** abre una ventana en dos pasos:
+  1. elegir qué contacto conservar (el sugerido viene marcado);
+  2. revisar el resultado, que llega rellenado con el `mergePreview` del servidor. Cada campo muestra como botones los valores distintos del grupo para elegir con un clic, y también se puede editar.
+
+  Se envían las versiones con las que se cargó el grupo: si otra pestaña modificó algún contacto, el backend responde 409, se avisa al usuario y los grupos se recargan. Al fusionar se invalida la caché de contactos, así la lista refleja el cambio.
+- **Historial** con las fusiones y los contactos que tenía cada una (★ = el conservado). **Deshacer** restaura los contactos; si ya se deshizo o el principal cambió después, se muestra el motivo.
