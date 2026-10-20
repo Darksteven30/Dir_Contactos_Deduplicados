@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { normalizeName } from '@/utils/match'
 
 const props = withDefaults(defineProps<{ name: string; size?: 'sm' | 'md' }>(), { size: 'md' })
 
@@ -12,14 +13,15 @@ const COLORS = [
   'bg-teal-100 text-teal-700',
 ]
 
-// Iniciales del nombre y un color estable para cada nombre (el mismo contacto, el mismo color).
+// Iniciales del nombre y un color estable para cada nombre. El color sale del nombre normalizado:
+// "José Pérez" y "JOSE PEREZ" se ven del mismo color, lo que ayuda a notar los duplicados.
 const initials = computed(() => {
   const words = props.name.trim().split(/\s+/).filter(Boolean)
   const last = words.length > 1 ? words[words.length - 1] : undefined
   return ((words[0]?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase()
 })
 const color = computed(() => {
-  const hash = [...props.name].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const hash = [...normalizeName(props.name)].reduce((sum, char) => sum + char.charCodeAt(0), 0)
   return COLORS[hash % COLORS.length]
 })
 </script>
