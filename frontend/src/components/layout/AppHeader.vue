@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseIcon, { type IconName } from '@/components/base/BaseIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const NAV: Array<{ name: string; label: string; icon: IconName }> = [
   { name: 'contacts', label: 'Contactos', icon: 'users' },
+  { name: 'duplicates', label: 'Duplicados', icon: 'merge' },
   { name: 'account', label: 'Mi cuenta', icon: 'user' },
 ]
+
+// Una sección queda activa también en sus subpáginas (p. ej. Duplicados → Historial de fusiones).
+const isActive = (name: string) => route.path.startsWith(router.resolve({ name }).path)
 
 async function logout(): Promise<void> {
   await auth.logout()
@@ -39,8 +44,13 @@ async function logout(): Promise<void> {
             v-for="item in NAV"
             :key="item.name"
             :to="{ name: item.name }"
-            class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            active-class="bg-brand-50 text-brand-700 hover:bg-brand-50 hover:text-brand-700"
+            class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+            :class="
+              isActive(item.name)
+                ? 'bg-brand-50 text-brand-700'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            "
+            :aria-current="isActive(item.name) ? 'page' : undefined"
           >
             <BaseIcon :name="item.icon" :size="18" />
             <span class="hidden sm:inline">{{ item.label }}</span>

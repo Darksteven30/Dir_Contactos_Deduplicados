@@ -29,6 +29,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: 'Contactos' },
   },
   {
+    path: '/duplicados',
+    name: 'duplicates',
+    component: () => import('@/views/DuplicatesView.vue'),
+    meta: { requiresAuth: true, title: 'Duplicados' },
+  },
+  {
+    path: '/duplicados/historial',
+    name: 'merge-history',
+    component: () => import('@/views/MergeHistoryView.vue'),
+    meta: { requiresAuth: true, title: 'Historial de fusiones' },
+  },
+  {
     path: '/cuenta',
     name: 'account',
     component: () => import('@/views/AccountView.vue'),
