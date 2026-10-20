@@ -98,3 +98,55 @@ export interface SimilarContact {
 export interface ContactConflictDetails {
   current: Contact
 }
+
+// ---- Duplicados y fusiones ----
+
+export interface DuplicatePair extends ContactMatch {
+  contactIds: [number, number]
+}
+
+/** Contactos que probablemente son la misma persona (agrupados de forma transitiva). */
+export interface DuplicateGroup {
+  /** Mayor puntaje entre los pares del grupo. */
+  score: number
+  /** El más completo (y el más antiguo si empatan): el que se conserva al fusionar. */
+  suggestedPrimaryId: number
+  /** Resultado de fusionar el grupo con el principal sugerido. */
+  mergePreview: ContactInput
+  contacts: Contact[]
+  pairs: DuplicatePair[]
+}
+
+export interface VersionedContactRef {
+  id: number
+  version: number
+}
+
+export interface MergeRequest {
+  primary: VersionedContactRef
+  duplicates: VersionedContactRef[]
+  /** Datos finales elegidos por el usuario; si se omiten, el backend los combina automáticamente. */
+  contact?: ContactInput
+}
+
+/** Contacto tal como estaba antes de una fusión. */
+export interface MergedContactSnapshot extends ContactInput {
+  id: number
+}
+
+export interface ContactMerge {
+  id: number
+  primaryContactId: number
+  mergedContactIds: number[]
+  /** Todos los contactos (principal incluido) antes de fusionar. */
+  before: MergedContactSnapshot[]
+  createdAt: string
+  /** null mientras la fusión siga vigente. */
+  undoneAt: string | null
+}
+
+export interface MergeResult {
+  merge: ContactMerge
+  /** Contacto principal con los datos finales. */
+  contact: Contact
+}
