@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (nunca subir credenciales)
+.env
+.env.*
+!.env.example
+
+# Build
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo / editores
+.DS_Store
+__MACOSX/
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Contexto local de Claude Code (no se versiona)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
