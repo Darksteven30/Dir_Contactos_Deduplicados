@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import path from 'node:path';
 import { createApp } from './app';
 import { env } from './config/env';
 import { runMigrations } from './database/migrator';
@@ -8,6 +9,12 @@ import { InMemoryJobQueue } from './shared/queue/jobQueue';
 import { scheduleRecurring } from './shared/queue/scheduler';
 
 const logger = createLogger({ level: env.LOG_LEVEL, pretty: env.NODE_ENV === 'development' });
+
+// En producción el backend sirve el frontend compilado (npm run build en la raíz lo deja en
+// frontend/dist). En desarrollo no: el frontend lo sirve Vite con recarga en caliente.
+const frontendDistDir =
+  env.FRONTEND_DIST_DIR ??
+  (env.NODE_ENV === 'production' ? path.resolve(__dirname, '../../frontend/dist') : undefined);
 
 // Si el apagado ordenado no termina en este tiempo, se fuerza la salida.
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -27,6 +34,7 @@ async function start(): Promise<void> {
         refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
         cookieSecure: env.COOKIE_SECURE,
         trustProxy: env.TRUST_PROXY,
+        ...(frontendDistDir ? { frontendDistDir } : {}),
       },
     });
 

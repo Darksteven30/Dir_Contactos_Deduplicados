@@ -20,6 +20,7 @@ import { UserController } from './modules/users/user.controller';
 import { PgUserRepository } from './modules/users/user.repository';
 import { createUserRouter } from './modules/users/user.routes';
 import { UserService } from './modules/users/user.service';
+import { createFrontendRouter } from './shared/http/frontend';
 import { createHealthRouter } from './shared/http/health';
 import type { Logger } from './shared/logging/logger';
 import { createAuthenticate } from './shared/middlewares/authenticate';
@@ -38,6 +39,8 @@ export interface AppConfig {
   cookieSecure: boolean;
   /** Valor de `trust proxy` de Express: cuántos proxies hay delante (0 = ninguno). */
   trustProxy: number;
+  /** Carpeta del frontend compilado; si tiene un build, se sirve en el mismo dominio. */
+  frontendDistDir?: string;
 }
 
 export interface AppDependencies {
@@ -105,19 +108,26 @@ export function createApp({ pool, config, logger }: AppDependencies): Applicatio
     new DeduplicationService(new PgDeduplicationRepository(pool)),
   );
 
-  app.get('/', (_req, res) => {
-    res.json({ message: 'API corriendo', docs: '/api-docs' });
-  });
+  const frontend = config.frontendDistDir ? createFrontendRouter(config.frontendDistDir) : null;
+  if (!frontend) {
+    // Sin frontend compilado (desarrollo: lo sirve Vite en otro puerto), la raíz informa de la API.
+    app.get('/', (_req, res) => {
+      res.json({ message: 'API corriendo', docs: '/api-docs' });
+    });
+  }
   const checkDatabase = async (): Promise<void> => {
     await pool.query('SELECT 1');
   };
   app.use('/health', createHealthRouter(checkDatabase, logger));
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(createSwaggerSpec(config.port)));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(createSwaggerSpec()));
   app.use('/api/auth', createAuthRouter(authController, authenticate));
   app.use('/api/users', createUserRouter(userController, authenticate));
   // Debe ir antes que /api/contacts: si no, "duplicates" se tomaría como el :id de un contacto.
   app.use('/api/contacts/duplicates', createDeduplicationRouter(deduplicationController, authenticate));
   app.use('/api/contacts', createContactRouter(contactController, authenticate, requireContactOwner));
+
+  // Después de la API: lo que no sea /api, /health ni /api-docs lo resuelve la app de Vue.
+  if (frontend) app.use(frontend);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(logger));
