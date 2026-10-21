@@ -283,3 +283,51 @@ Pantalla `/duplicados` (en el menú: *Duplicados*), con dos pestañas: *Por revi
 
   Se envían las versiones con las que se cargó el grupo: si otra pestaña modificó algún contacto, el backend responde 409, se avisa al usuario y los grupos se recargan. Al fusionar se invalida la caché de contactos, así la lista refleja el cambio.
 - **Historial** con las fusiones y los contactos que tenía cada una (★ = el conservado). **Deshacer** restaura los contactos; si ya se deshizo o el principal cambió después, se muestra el motivo.
+
+## Despliegue en la nube
+
+La aplicación se publica como **un solo servicio web en [Render](https://render.com)** (plan gratuito), con la base de datos en **[Neon](https://neon.com)** (PostgreSQL gratuito, sin vencimiento y con la extensión `pg_trgm`).
+
+```
+https://<tu-app>.onrender.com
+├── /api/...     API REST (Express)
+├── /health      estado del servicio (lo usa Render para saber si la app está viva)
+├── /api-docs    Swagger
+└── /*           frontend compilado (Vue)  ──►  Neon (PostgreSQL, conexión cifrada)
+```
+
+**¿Por qué un solo servicio?** La cookie del refresh token es `SameSite=Strict`: el navegador solo la envía al mismo dominio. Si el frontend y la API quedaran en dominios distintos, la sesión no se podría renovar. Por eso Express sirve el build de Vue ([`frontend.ts`](backend/src/shared/http/frontend.ts)): las rutas de la API responden como siempre, y cualquier otra ruta (`/contactos`, `/duplicados`…) devuelve `index.html` para que decida Vue Router. Los archivos de `/assets` tienen hash en el nombre y se guardan en caché un año; `index.html` nunca se guarda, así cada despliegue se ve de inmediato.
+
+La configuración está en [`render.yaml`](render.yaml) (Blueprint de Render):
+
+| Paso | Comando |
+|---|---|
+| Build | `npm ci --prefix backend --include=dev && npm ci --prefix frontend --include=dev && npm run build` |
+| Arranque | `npm start`: aplica las migraciones pendientes y levanta el servidor |
+| Verificación | `GET /health` |
+| Rama publicada | `main` (cada merge a `main` despliega solo) |
+
+Variables de entorno en Render:
+
+| Variable | Valor |
+|---|---|
+| `DATABASE_URL` | Cadena de conexión **directa** de Neon (no la *pooled*: las migraciones usan `pg_advisory_lock`), con `?sslmode=require`. Se pega en el panel; nunca va al repositorio |
+| `JWT_ACCESS_SECRET` | La genera Render automáticamente |
+| `NODE_ENV=production`, `TRUST_PROXY=1`, `COOKIE_SECURE=true`, `NODE_VERSION=24` | Definidas en `render.yaml` |
+
+Para probar en local exactamente lo que corre en la nube:
+
+```bash
+npm run build                      # compila frontend y backend
+NODE_ENV=production npm start      # sirve todo en http://localhost:3000
+```
+
+**Datos de demostración en la nube:** `npm run seed` no se ejecuta con `NODE_ENV=production`, para no tocar datos reales por accidente. Para cargar la cuenta demo en Neon, se ejecuta desde un PC apuntando a esa base (Git Bash, dentro de `backend/`):
+
+```bash
+DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require" npm run seed
+```
+
+Solo crea o actualiza `demo@example.com` y `otro@example.com`; no toca a otros usuarios.
+
+**Plan gratuito de Render:** el servidor se suspende tras unos 15 minutos sin visitas, y la primera petición después tarda alrededor de un minuto en responder mientras arranca.

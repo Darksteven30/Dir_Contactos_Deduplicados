@@ -5,7 +5,7 @@ import swaggerJsdoc from 'swagger-jsdoc';
 const toGlob = (relative: string) => path.join(__dirname, relative).replace(/\\/g, '/');
 const routeFiles = [toGlob('../modules/**/*.routes.{ts,js}'), toGlob('../shared/http/health.{ts,js}')];
 
-export function createSwaggerSpec(port: number): object {
+export function createSwaggerSpec(): object {
   return swaggerJsdoc({
     definition: {
       openapi: '3.0.0',
@@ -14,7 +14,8 @@ export function createSwaggerSpec(port: number): object {
         version: '1.0.0',
         description: 'API REST del Directorio de Contactos con Deduplicación',
       },
-      servers: [{ url: `http://localhost:${port}`, description: 'Servidor local' }],
+      // URL relativa: funciona igual en local y en la nube (Swagger usa el mismo servidor que lo sirve).
+      servers: [{ url: '/', description: 'Este servidor' }],
     },
     apis: routeFiles,
   });
