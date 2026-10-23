@@ -34,6 +34,7 @@ async function start(): Promise<void> {
         refreshTokenTtlDays: env.REFRESH_TOKEN_TTL_DAYS,
         cookieSecure: env.COOKIE_SECURE,
         trustProxy: env.TRUST_PROXY,
+        authRateLimitMax: env.AUTH_RATE_LIMIT_MAX,
         ...(frontendDistDir ? { frontendDistDir } : {}),
       },
     });
