@@ -43,6 +43,8 @@ export interface AppConfig {
   frontendDistDir?: string;
   /** Intentos de login/registro por IP cada 15 min. Por defecto 10; las pruebas E2E lo suben. */
   authRateLimitMax?: number;
+  /** Encabezado del CDN con la IP real del usuario para el rate limit (en Render: `cf-connecting-ip`). */
+  clientIpHeader?: string;
 }
 
 export interface AppDependencies {
@@ -126,6 +128,7 @@ export function createApp({ pool, config, logger }: AppDependencies): Applicatio
     '/api/auth',
     createAuthRouter(authController, authenticate, {
       ...(config.authRateLimitMax ? { credentialsLimit: config.authRateLimitMax } : {}),
+      ...(config.clientIpHeader ? { clientIpHeader: config.clientIpHeader } : {}),
     }),
   );
   app.use('/api/users', createUserRouter(userController, authenticate));

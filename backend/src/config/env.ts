@@ -24,11 +24,14 @@ const envSchema = z
     COOKIE_SECURE: z.stringbool().default(true),
 
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-    // Número de proxies delante de la app (p. ej. 1 en Render/Railway). 0 = conexión directa.
+    // Número de proxies delante de la app (1 en Render). 0 = conexión directa.
     TRUST_PROXY: z.coerce.number().int().min(0).default(0),
     TOKEN_CLEANUP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
     // Intentos de login/registro por IP cada 15 minutos. Solo las pruebas E2E lo suben.
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+    // Encabezado con la IP real del usuario que pone el CDN (en Render, que va detrás de Cloudflare:
+    // cf-connecting-ip). El rate limit cuenta por esa IP; sin él, por la IP que resuelve trust proxy.
+    CLIENT_IP_HEADER: z.string().min(1).toLowerCase().optional(),
 
     // Carpeta del frontend compilado (Vue). Si existe, el backend lo sirve en el mismo dominio
     // que la API: así la cookie del refresh token (SameSite=Strict) funciona en producción.
