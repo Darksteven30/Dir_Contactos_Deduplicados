@@ -1,0 +1,9 @@
+{
+  "spec": ["tests/**/*.e2e.ts"],
+  "node-option": ["import=tsx"],
+  "require": ["support/hooks.ts"],
+  "timeout": 60000,
+  "slow": 10000,
+  "reporter": "mochawesome",
+  "reporter-option": ["reportDir=reports", "reportFilename=reporte-e2e", "charts=true", "quiet=true"]
+}

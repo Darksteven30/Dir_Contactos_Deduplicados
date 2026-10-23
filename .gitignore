@@ -9,6 +9,9 @@ node_modules/
 # Build
 dist/
 
+# Reportes y capturas de las pruebas E2E (se generan en cada ejecución)
+e2e/reports/
+
 # Logs
 *.log
 npm-debug.log*

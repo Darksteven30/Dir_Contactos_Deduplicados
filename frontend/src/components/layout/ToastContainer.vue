@@ -25,6 +25,7 @@ const STYLES = {
       <div
         v-for="toast in toastStore.toasts"
         :key="toast.id"
+        data-testid="toast"
         class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl bg-white p-4 text-sm text-slate-800 shadow-lg ring-1 ring-slate-200"
         :role="toast.variant === 'error' ? 'alert' : 'status'"
       >

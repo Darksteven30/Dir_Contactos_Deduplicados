@@ -49,7 +49,9 @@ async function confirm(): Promise<void> {
       <BaseButton variant="secondary" :disabled="pending" @click="open = false"
         >Cancelar</BaseButton
       >
-      <BaseButton variant="danger" :loading="pending" @click="confirm">Eliminar</BaseButton>
+      <BaseButton variant="danger" :loading="pending" data-testid="delete-confirm" @click="confirm"
+        >Eliminar</BaseButton
+      >
     </template>
   </BaseModal>
 </template>

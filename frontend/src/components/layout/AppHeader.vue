@@ -44,6 +44,7 @@ async function logout(): Promise<void> {
             v-for="item in NAV"
             :key="item.name"
             :to="{ name: item.name }"
+            :data-testid="`nav-${item.name}`"
             class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
             :class="
               isActive(item.name)
@@ -60,7 +61,9 @@ async function logout(): Promise<void> {
 
       <div v-if="auth.isAuthenticated" class="flex items-center gap-3">
         <span class="hidden text-sm text-slate-600 md:inline">{{ auth.user?.name }}</span>
-        <BaseButton variant="ghost" :loading="auth.pending" @click="logout">Salir</BaseButton>
+        <BaseButton variant="ghost" :loading="auth.pending" data-testid="logout" @click="logout"
+          >Salir</BaseButton
+        >
       </div>
     </div>
   </header>

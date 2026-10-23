@@ -4,6 +4,13 @@ import type { AuthController } from './auth.controller';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
+export interface AuthRouterOptions {
+  /** Intentos de login/registro permitidos por IP cada 15 minutos (protección contra fuerza bruta). */
+  credentialsLimit?: number;
+}
+
+const DEFAULT_CREDENTIALS_LIMIT = 10;
+
 /**
  * @swagger
  * components:
@@ -57,12 +64,16 @@ const FIFTEEN_MINUTES = 15 * 60 * 1000;
  *             user:
  *               $ref: '#/components/schemas/User'
  */
-export function createAuthRouter(controller: AuthController, authenticate: RequestHandler): Router {
+export function createAuthRouter(
+  controller: AuthController,
+  authenticate: RequestHandler,
+  { credentialsLimit = DEFAULT_CREDENTIALS_LIMIT }: AuthRouterOptions = {},
+): Router {
   const router = Router();
 
   const credentialsLimiter = createRateLimiter({
     windowMs: FIFTEEN_MINUTES,
-    limit: 10,
+    limit: credentialsLimit,
     message: 'Demasiados intentos. Espera 15 minutos e intenta de nuevo',
   });
   const refreshLimiter = createRateLimiter({

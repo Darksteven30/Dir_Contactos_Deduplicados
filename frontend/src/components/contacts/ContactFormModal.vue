@@ -153,6 +153,7 @@ function overwriteWithMine(): void {
 
       <BaseInput
         v-model="form.fullName"
+        data-testid="contact-fullName"
         label="Nombre completo"
         autocomplete="off"
         required
@@ -161,6 +162,7 @@ function overwriteWithMine(): void {
       <div class="grid gap-4 sm:grid-cols-2">
         <BaseInput
           v-model="form.email"
+          data-testid="contact-email"
           label="Email"
           type="email"
           autocomplete="off"
@@ -168,6 +170,7 @@ function overwriteWithMine(): void {
         />
         <BaseInput
           v-model="form.phone"
+          data-testid="contact-phone"
           label="Teléfono"
           type="tel"
           autocomplete="off"
@@ -176,12 +179,14 @@ function overwriteWithMine(): void {
       </div>
       <BaseInput
         v-model="form.company"
+        data-testid="contact-company"
         label="Empresa"
         autocomplete="off"
         :error="fieldError('company')"
       />
       <BaseTextarea
         v-model="form.notes"
+        data-testid="contact-notes"
         label="Notas"
         :maxlength="NOTES_MAX_LENGTH"
         :error="fieldError('notes')"
@@ -198,7 +203,7 @@ function overwriteWithMine(): void {
       <BaseButton variant="secondary" :disabled="pending" @click="open = false"
         >Cancelar</BaseButton
       >
-      <BaseButton type="submit" form="contact-form" :loading="pending">
+      <BaseButton data-testid="contact-submit" type="submit" form="contact-form" :loading="pending">
         {{ isEditing ? 'Guardar cambios' : 'Crear contacto' }}
       </BaseButton>
     </template>
