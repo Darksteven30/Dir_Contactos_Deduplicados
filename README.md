@@ -1,5 +1,9 @@
 # Dir_Contactos_Deduplicados
 
+[![CI](https://github.com/Darksteven30/Dir_Contactos_Deduplicados/actions/workflows/ci.yml/badge.svg)](https://github.com/Darksteven30/Dir_Contactos_Deduplicados/actions/workflows/ci.yml)
+
+**En línea:** https://dir-contactos-deduplicados.onrender.com (demo: `demo@example.com` / `demo12345`)
+
 Directorio de contactos con deduplicación: búsqueda difusa (Levenshtein / trigramas) para sugerir la fusión de contactos redundantes.
 
 ## Estructura
@@ -54,7 +58,8 @@ Abrir http://localhost:5173. Cada línea de la terminal sale marcada con `[back]
 |---|---|
 | `npm run dev` | Backend y frontend a la vez (con [concurrently](https://github.com/open-cli-tools/concurrently)) |
 | `npm run install:all` | Instala las dependencias de la raíz, el backend y el frontend |
-| `npm test` | Todas las pruebas: backend y frontend |
+| `npm test` | Pruebas unitarias de backend y frontend (sin base de datos) |
+| `npm run test:integration` | Pruebas de integración contra PostgreSQL real (ver [Pruebas](#pruebas)) |
 | `npm run check` | Tipos del backend y del frontend, y lint del frontend |
 
 Los pasos siguientes explican cada parte por separado.
@@ -283,6 +288,26 @@ Pantalla `/duplicados` (en el menú: *Duplicados*), con dos pestañas: *Por revi
 
   Se envían las versiones con las que se cargó el grupo: si otra pestaña modificó algún contacto, el backend responde 409, se avisa al usuario y los grupos se recargan. Al fusionar se invalida la caché de contactos, así la lista refleja el cambio.
 - **Historial** con las fusiones y los contactos que tenía cada una (★ = el conservado). **Deshacer** restaura los contactos; si ya se deshizo o el principal cambió después, se muestra el motivo.
+
+## Pruebas
+
+| Tipo | Comando | Qué cubre |
+|---|---|---|
+| **Unitarias del backend** | `npm test` en `backend/` | Algoritmos (Levenshtein, Union-Find, similitud, combinación al fusionar), servicios con repositorios en memoria, rutas HTTP con `supertest`, cola, logs y correlation id |
+| **Integración del backend** | `npm run test:integration` en `backend/` | La app completa contra **PostgreSQL real**: migraciones y su bloqueo, búsqueda con `pg_trgm`, privacidad entre usuarios, bloqueo optimista con ediciones simultáneas, rotación y reutilización del refresh token, los 8 grupos de la demo con el SQL real, fusión concurrente, historial y deshacer |
+| **Frontend** | `npm run test:unit` en `frontend/` | Cliente HTTP e interceptores, stores de Pinia, guards, formularios y pantallas (Vue Test Utils) |
+
+Las de integración usan una **base exclusiva para pruebas**, por defecto `contactos_test`, con el mismo usuario y contraseña del `.env`. Antes de correr la vacían y la recrean con las migraciones, así que **nunca tocan `contactos_db`**. Por seguridad, se niegan a ejecutarse si el nombre de la base no contiene "test". Se puede usar otra con `TEST_DATABASE_URL` o `TEST_DB_NAME`.
+
+Para crearla una vez (en DBeaver o con `psql`):
+
+```sql
+CREATE DATABASE contactos_test;
+```
+
+**Concurrencia comprobada de verdad:** las pruebas de "dos fusiones simultáneas" y "dos renovaciones simultáneas" bloquean la fila desde otra transacción para que ambas peticiones queden esperando a la vez, y luego la liberan. Si se quita el `SELECT … FOR UPDATE` del código, la prueba de fusión falla con `[201, 201]`: las dos peticiones fusionarían el mismo grupo.
+
+**Integración continua** ([`ci.yml`](.github/workflows/ci.yml)): en cada Pull Request y en cada push a `develop` o `main`, GitHub Actions levanta un PostgreSQL temporal y ejecuta, en el backend, tipos, pruebas unitarias, pruebas de integración y build; y en el frontend, tipos, lint, pruebas y build. El resultado aparece como ✅ o ❌ en el PR y en la insignia de arriba.
 
 ## Despliegue en la nube
 
