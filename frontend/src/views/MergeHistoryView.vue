@@ -85,6 +85,7 @@ async function undo(merge: ContactMerge): Promise<void> {
     <ul v-else-if="store.history" class="space-y-3">
       <li
         v-for="merge in store.history.items"
+        data-testid="merge-item"
         :key="merge.id"
         class="rounded-2xl bg-white p-5 ring-1 ring-slate-200"
         :class="{ 'opacity-70': merge.undoneAt }"
@@ -104,6 +105,7 @@ async function undo(merge: ContactMerge): Promise<void> {
           <span
             v-if="merge.undoneAt"
             class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
+            data-testid="merge-undone"
             >Deshecha</span
           >
           <BaseButton
@@ -111,6 +113,7 @@ async function undo(merge: ContactMerge): Promise<void> {
             variant="secondary"
             :loading="undoing === merge.id"
             :disabled="undoing !== null"
+            data-testid="merge-undo"
             @click="undo(merge)"
           >
             <BaseIcon name="history" :size="16" /> Deshacer

@@ -38,7 +38,7 @@ const updatedAt = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div data-testid="contact-conflict" class="space-y-4">
     <BaseAlert variant="warning" title="Este contacto cambió mientras lo editabas">
       Otra sesión lo guardó el {{ updatedAt }}. Revisa las diferencias y elige qué versión
       conservar.
@@ -54,7 +54,7 @@ const updatedAt = computed(() =>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr v-for="row in differences" :key="row.field">
+          <tr data-testid="conflict-row" v-for="row in differences" :key="row.field">
             <th scope="row" class="px-3 py-2 font-medium text-slate-700">{{ row.label }}</th>
             <td class="px-3 py-2 break-words text-brand-700">{{ row.mine }}</td>
             <td class="px-3 py-2 break-words text-slate-900">{{ row.current }}</td>
@@ -69,10 +69,17 @@ const updatedAt = computed(() =>
     </div>
 
     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-      <BaseButton variant="secondary" :disabled="pending" @click="emit('use-current')">
+      <BaseButton
+        variant="secondary"
+        :disabled="pending"
+        data-testid="conflict-use-current"
+        @click="emit('use-current')"
+      >
         Usar la versión actual
       </BaseButton>
-      <BaseButton :loading="pending" @click="emit('overwrite')">Guardar mis cambios</BaseButton>
+      <BaseButton :loading="pending" data-testid="conflict-overwrite" @click="emit('overwrite')"
+        >Guardar mis cambios</BaseButton
+      >
     </div>
   </div>
 </template>

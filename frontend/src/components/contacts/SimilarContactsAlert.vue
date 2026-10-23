@@ -11,7 +11,11 @@ const MAX_SHOWN = 3
 </script>
 
 <template>
-  <div class="rounded-lg bg-amber-50 p-4 ring-1 ring-inset ring-amber-200" role="status">
+  <div
+    class="rounded-lg bg-amber-50 p-4 ring-1 ring-inset ring-amber-200"
+    data-testid="similar-alert"
+    role="status"
+  >
     <p class="flex items-center gap-2 text-sm font-semibold text-amber-800">
       <BaseIcon name="alert" :size="18" />
       {{
@@ -21,6 +25,7 @@ const MAX_SHOWN = 3
     <ul class="mt-3 space-y-2">
       <li
         v-for="{ contact, match } in similar.slice(0, MAX_SHOWN)"
+        data-testid="similar-item"
         :key="contact.id"
         class="flex items-center gap-3 rounded-lg bg-white p-2 ring-1 ring-amber-100"
       >

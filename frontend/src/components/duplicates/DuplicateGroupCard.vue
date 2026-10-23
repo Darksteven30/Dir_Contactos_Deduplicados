@@ -26,7 +26,10 @@ const confidence = computed(() => {
 </script>
 
 <template>
-  <article class="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+  <article
+    data-testid="duplicate-group"
+    class="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200"
+  >
     <header
       class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"
     >
@@ -37,10 +40,15 @@ const confidence = computed(() => {
         <span class="text-sm text-slate-600">{{ group.contacts.length }} contactos</span>
       </div>
       <div class="flex gap-2">
-        <BaseButton variant="secondary" :disabled="busy" @click="emit('dismiss', group)">
+        <BaseButton
+          variant="secondary"
+          :disabled="busy"
+          data-testid="group-dismiss"
+          @click="emit('dismiss', group)"
+        >
           No son duplicados
         </BaseButton>
-        <BaseButton :disabled="busy" @click="emit('merge', group)">
+        <BaseButton :disabled="busy" data-testid="group-merge" @click="emit('merge', group)">
           <BaseIcon name="merge" :size="18" /> Fusionar
         </BaseButton>
       </div>
@@ -52,6 +60,8 @@ const confidence = computed(() => {
     <ul class="grid gap-px bg-slate-100 sm:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
       <li
         v-for="contact in group.contacts"
+        data-testid="group-contact"
+        :data-name="contact.fullName"
         :key="contact.id"
         class="flex flex-col gap-3 bg-white p-5"
       >
@@ -99,6 +109,7 @@ const confidence = computed(() => {
           type="button"
           class="mt-auto inline-flex items-center gap-1.5 self-start rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
           :disabled="busy"
+          data-testid="group-exclude"
           @click="emit('exclude', group, contact.id)"
         >
           <BaseIcon name="userX" :size="14" /> No es la misma persona

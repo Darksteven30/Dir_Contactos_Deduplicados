@@ -107,6 +107,8 @@ async function submit(): Promise<void> {
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
           <label
             v-for="contact in group.contacts"
+            data-testid="merge-primary-option"
+            :data-name="contact.fullName"
             :key="contact.id"
             class="flex cursor-pointer items-center gap-3 rounded-lg p-3 ring-1 transition-colors"
             :class="
@@ -162,6 +164,7 @@ async function submit(): Promise<void> {
             <div v-if="alternatives(item.field).length > 1" class="flex flex-wrap gap-1.5">
               <button
                 v-for="value in alternatives(item.field)"
+                data-testid="merge-choice"
                 :key="value"
                 type="button"
                 class="rounded-full px-2.5 py-1 text-xs ring-1 transition-colors"
@@ -199,7 +202,9 @@ async function submit(): Promise<void> {
       <BaseButton variant="secondary" :disabled="pending" @click="open = false"
         >Cancelar</BaseButton
       >
-      <BaseButton type="submit" form="merge-form" :loading="pending">Fusionar</BaseButton>
+      <BaseButton data-testid="merge-submit" type="submit" form="merge-form" :loading="pending"
+        >Fusionar</BaseButton
+      >
     </template>
   </BaseModal>
 </template>
