@@ -4,11 +4,13 @@
   "description": "Directorio de contactos con deduplicación: comandos para trabajar con backend y frontend a la vez",
   "scripts": {
     "dev": "concurrently --names back,front --prefix-colors blue,green --kill-others-on-fail \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend && npm install --prefix e2e",
     "test": "npm test --prefix backend && npm run test:unit --prefix frontend -- --run",
-    "check": "npm run typecheck --prefix backend && npm run type-check --prefix frontend && npm run lint --prefix frontend",
+    "check": "npm run typecheck --prefix backend && npm run type-check --prefix frontend && npm run lint --prefix frontend && npm run typecheck --prefix e2e",
     "build": "npm run build --prefix frontend && npm run build --prefix backend",
-    "start": "npm start --prefix backend"
+    "start": "npm start --prefix backend",
+    "test:integration": "npm run test:integration --prefix backend",
+    "test:e2e": "npm run build && npm test --prefix e2e"
   },
   "engines": {
     "node": ">=24.12.0"

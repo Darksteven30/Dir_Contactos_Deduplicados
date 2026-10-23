@@ -1,0 +1,22 @@
+{
+  "name": "contactos-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Pruebas de extremo a extremo (E2E) con Selenium WebDriver + Mocha + TypeScript",
+  "scripts": {
+    "test": "mocha",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.13.4",
+    "@types/selenium-webdriver": "^4.35.7",
+    "chai": "^6.3.0",
+    "mocha": "^12.0.3",
+    "mochawesome": "^8.1.1",
+    "selenium-webdriver": "^4.51.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,0 +1,134 @@
+# Integración continua: en cada Pull Request (y en cada push a develop/main) GitHub verifica que
+# el proyecto compila y que pasan todas las pruebas. El resultado aparece como ✅/❌ en el PR.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+# Si llega un push nuevo a la misma rama, se cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (tipos, unitarias, integración y build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    # PostgreSQL temporal solo para esta ejecución (la imagen oficial ya incluye pg_trgm).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: contactos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/contactos_test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Verificación de tipos
+        run: npm run typecheck
+      - name: Pruebas unitarias
+        run: npm test
+      - name: Pruebas de integración (PostgreSQL real)
+        run: npm run test:integration
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend (tipos, lint, pruebas y build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Verificación de tipos
+        run: npm run type-check
+      # Sin --fix: en CI el lint solo revisa, no corrige.
+      - name: Lint
+        run: npx oxlint . && npx eslint .
+      - name: Pruebas
+        run: npm run test:unit -- --run
+      - name: Build
+        run: npm run build-only
+
+  e2e:
+    name: E2E (Selenium + Chrome headless)
+    runs-on: ubuntu-latest
+    # Solo si el backend y el frontend ya pasaron: no tiene sentido probar en el navegador algo roto.
+    needs: [backend, frontend]
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: contactos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/contactos_test
+      JWT_ACCESS_SECRET: secreto-solo-para-ci-con-mas-de-32-caracteres
+      HEADLESS: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci --prefix backend && npm ci --prefix frontend && npm ci --prefix e2e
+      - name: Verificación de tipos de las pruebas
+        run: npm run typecheck --prefix e2e
+      - name: Compilar la app
+        run: npm run build
+      # Chrome ya viene instalado en ubuntu-latest; Selenium Manager descarga el chromedriver correcto.
+      - name: Pruebas E2E
+        run: npm test --prefix e2e
+      - name: Subir reporte y capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-e2e
+          path: e2e/reports/
+          retention-days: 14

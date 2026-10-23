@@ -59,7 +59,7 @@ function exclude(group: DuplicateGroup, contactId: number): void {
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Duplicados</h1>
-        <p class="mt-1 text-sm text-slate-600">
+        <p data-testid="duplicates-summary" class="mt-1 text-sm text-slate-600">
           <template v-if="store.groups.length > 0">
             {{ store.groups.length }} {{ store.groups.length === 1 ? 'grupo' : 'grupos' }} por
             revisar · podrías quitar {{ store.redundantCount }}
@@ -118,6 +118,7 @@ function exclude(group: DuplicateGroup, contactId: number): void {
 
     <div
       v-else-if="isClean"
+      data-testid="duplicates-clean"
       class="rounded-2xl bg-white px-6 py-14 text-center ring-1 ring-slate-200"
     >
       <div

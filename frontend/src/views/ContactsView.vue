@@ -100,12 +100,12 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Contactos</h1>
-        <p class="mt-1 text-sm text-slate-600">
+        <p data-testid="contacts-summary" class="mt-1 text-sm text-slate-600">
           {{ store.total }} {{ store.total === 1 ? 'contacto' : 'contactos' }}
           {{ store.isSearching ? `para «${store.query.q}»` : 'en tu directorio' }}
         </p>
       </div>
-      <BaseButton @click="openCreate"
+      <BaseButton data-testid="contacts-new" @click="openCreate"
         ><BaseIcon name="plus" :size="18" /> Nuevo contacto</BaseButton
       >
     </div>
@@ -118,6 +118,7 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
       />
       <input
         v-model="search"
+        data-testid="contacts-search"
         type="search"
         aria-label="Buscar contactos"
         placeholder="Buscar por nombre, email o teléfono… (tolera errores: «jose peres»)"
@@ -162,6 +163,7 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
     <!-- Sin resultados -->
     <div
       v-else-if="isEmpty"
+      data-testid="contacts-empty"
       class="rounded-2xl bg-white px-6 py-14 text-center ring-1 ring-slate-200"
     >
       <div class="mx-auto grid size-12 place-items-center rounded-full bg-brand-50 text-brand-600">
@@ -194,6 +196,8 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
       <ul class="divide-y divide-slate-100">
         <li
           v-for="contact in store.items"
+          data-testid="contact-row"
+          :data-name="contact.fullName"
           :key="contact.id"
           class="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 sm:px-6"
         >
@@ -205,6 +209,7 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
                 v-if="store.isSearching"
                 class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700"
                 :title="'Parecido con la búsqueda'"
+                data-testid="contact-score"
               >
                 {{ percent(store.scores[contact.id]) }}
               </span>
@@ -227,6 +232,7 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
               type="button"
               class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-brand-700"
               :aria-label="`Editar a ${contact.fullName}`"
+              data-testid="contact-edit"
               @click="openEdit(contact)"
             >
               <BaseIcon name="pencil" :size="18" />
@@ -235,6 +241,7 @@ const percent = (score: number | undefined) => `${Math.round((score ?? 0) * 100)
               type="button"
               class="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
               :aria-label="`Eliminar a ${contact.fullName}`"
+              data-testid="contact-delete"
               @click="askDelete(contact)"
             >
               <BaseIcon name="trash" :size="18" />

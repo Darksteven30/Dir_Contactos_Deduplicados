@@ -41,6 +41,8 @@ export interface AppConfig {
   trustProxy: number;
   /** Carpeta del frontend compilado; si tiene un build, se sirve en el mismo dominio. */
   frontendDistDir?: string;
+  /** Intentos de login/registro por IP cada 15 min. Por defecto 10; las pruebas E2E lo suben. */
+  authRateLimitMax?: number;
 }
 
 export interface AppDependencies {
@@ -120,7 +122,12 @@ export function createApp({ pool, config, logger }: AppDependencies): Applicatio
   };
   app.use('/health', createHealthRouter(checkDatabase, logger));
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(createSwaggerSpec()));
-  app.use('/api/auth', createAuthRouter(authController, authenticate));
+  app.use(
+    '/api/auth',
+    createAuthRouter(authController, authenticate, {
+      ...(config.authRateLimitMax ? { credentialsLimit: config.authRateLimitMax } : {}),
+    }),
+  );
   app.use('/api/users', createUserRouter(userController, authenticate));
   // Debe ir antes que /api/contacts: si no, "duplicates" se tomaría como el :id de un contacto.
   app.use('/api/contacts/duplicates', createDeduplicationRouter(deduplicationController, authenticate));

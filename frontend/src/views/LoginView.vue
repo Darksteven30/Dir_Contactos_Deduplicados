@@ -35,10 +35,14 @@ async function submit(): Promise<void> {
 
     <BaseCard>
       <form class="space-y-5" novalidate @submit.prevent="submit">
-        <BaseAlert v-if="sessionExpired && !auth.error" variant="warning">
+        <BaseAlert
+          v-if="sessionExpired && !auth.error"
+          data-testid="login-expired"
+          variant="warning"
+        >
           Tu sesión expiró. Vuelve a iniciar sesión para continuar.
         </BaseAlert>
-        <BaseAlert v-if="auth.error" variant="error">
+        <BaseAlert v-if="auth.error" data-testid="login-error" variant="error">
           {{ auth.error.message }}
           <span
             v-if="auth.error.correlationId && auth.error.status >= 500"
@@ -50,6 +54,7 @@ async function submit(): Promise<void> {
 
         <BaseInput
           v-model="email"
+          data-testid="login-email"
           label="Email"
           type="email"
           autocomplete="email"
@@ -58,6 +63,7 @@ async function submit(): Promise<void> {
         />
         <BaseInput
           v-model="password"
+          data-testid="login-password"
           label="Contraseña"
           type="password"
           autocomplete="current-password"
@@ -65,7 +71,9 @@ async function submit(): Promise<void> {
           :error="fieldError('password')"
         />
 
-        <BaseButton type="submit" block :loading="auth.pending">Iniciar sesión</BaseButton>
+        <BaseButton type="submit" block data-testid="login-submit" :loading="auth.pending"
+          >Iniciar sesión</BaseButton
+        >
       </form>
     </BaseCard>
 
