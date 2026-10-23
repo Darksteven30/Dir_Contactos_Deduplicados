@@ -35,6 +35,7 @@ async function start(): Promise<void> {
         cookieSecure: env.COOKIE_SECURE,
         trustProxy: env.TRUST_PROXY,
         authRateLimitMax: env.AUTH_RATE_LIMIT_MAX,
+        ...(env.CLIENT_IP_HEADER ? { clientIpHeader: env.CLIENT_IP_HEADER } : {}),
         ...(frontendDistDir ? { frontendDistDir } : {}),
       },
     });

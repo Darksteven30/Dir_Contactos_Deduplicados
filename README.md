@@ -206,9 +206,9 @@ La fusión es **una sola transacción ACID**:
 - **Seguridad HTTP**: `helmet` agrega los headers de seguridad (CSP, `nosniff`, protección contra clickjacking, HSTS) y oculta `X-Powered-By`.
 - **`GET /health`**: verifica la conexión con PostgreSQL (200 o 503). Lo usan las plataformas de despliegue.
 - **Apagado ordenado**: ante `SIGTERM` o `SIGINT` el servidor deja de aceptar conexiones, termina las peticiones en curso y los trabajos de la cola, y cierra el pool de PostgreSQL.
-- **Detrás de un proxy** (Render, Railway…): configurar `TRUST_PROXY=1` para que el rate limit vea la IP real de cada usuario.
+- **IP real del usuario detrás de proxies**: el límite de intentos de login cuenta por la IP que Cloudflare pone en el encabezado `CF-Connecting-IP` (`CLIENT_IP_HEADER=cf-connecting-ip` en Render), que el cliente no puede falsificar porque Cloudflare lo sobrescribe. Contar por saltos de proxy (`trust proxy`) resultó frágil en Render: la cadena de proxies cambia entre peticiones, Express tomaba la IP de un servidor de Cloudflare, y un mismo usuario repartía sus intentos entre varios contadores (se detectó probando el límite en producción). Sin el encabezado, como en desarrollo local, se cuenta por la IP de la conexión. Las pruebas de [`rateLimit.test.ts`](backend/tests/shared/rateLimit.test.ts) reproducen el caso.
 
-Variables nuevas en `.env` (ver `.env.example`): `LOG_LEVEL`, `TRUST_PROXY`, `TOKEN_CLEANUP_INTERVAL_MINUTES`. Todas tienen valor por defecto.
+Variables nuevas en `.env` (ver `.env.example`): `LOG_LEVEL`, `TRUST_PROXY`, `CLIENT_IP_HEADER`, `TOKEN_CLEANUP_INTERVAL_MINUTES`. Todas son opcionales o tienen valor por defecto.
 
 ### 3. Frontend
 
@@ -340,7 +340,7 @@ Variables de entorno en Render:
 |---|---|
 | `DATABASE_URL` | Cadena de conexión **directa** de Neon (no la *pooled*: las migraciones usan `pg_advisory_lock`), con `?sslmode=require`. Se pega en el panel; nunca va al repositorio |
 | `JWT_ACCESS_SECRET` | La genera Render automáticamente |
-| `NODE_ENV=production`, `TRUST_PROXY=1`, `COOKIE_SECURE=true`, `NODE_VERSION=24` | Definidas en `render.yaml` |
+| `NODE_ENV=production`, `TRUST_PROXY=1`, `CLIENT_IP_HEADER=cf-connecting-ip` (IP real del usuario para el límite de intentos), `COOKIE_SECURE=true`, `NODE_VERSION=24` | Definidas en `render.yaml` |
 
 Para probar en local exactamente lo que corre en la nube:
 

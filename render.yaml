@@ -23,9 +23,14 @@ services:
         value: production
       - key: NODE_VERSION
         value: "24"
-      # Render pone un proxy delante: sin esto el rate limit vería a todos como la misma IP.
+      # Render pone proxies delante (Cloudflare y su propia infraestructura).
       - key: TRUST_PROXY
         value: "1"
+      # El rate limit del login cuenta por la IP que Cloudflare pone en CF-Connecting-IP. Contar por
+      # saltos de proxy no sirve aquí: la cadena cambia y se tomaba la IP de un servidor de Cloudflare,
+      # repartiendo el límite entre varios contadores. Ver backend/tests/shared/rateLimit.test.ts.
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
       - key: COOKIE_SECURE
         value: "true"
       - key: LOG_LEVEL
