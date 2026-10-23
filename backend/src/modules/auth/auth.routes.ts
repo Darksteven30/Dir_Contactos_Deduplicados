@@ -7,6 +7,8 @@ const FIFTEEN_MINUTES = 15 * 60 * 1000;
 export interface AuthRouterOptions {
   /** Intentos de login/registro permitidos por IP cada 15 minutos (protección contra fuerza bruta). */
   credentialsLimit?: number;
+  /** Encabezado del CDN con la IP real del usuario (p. ej. `cf-connecting-ip`) para contar los intentos. */
+  clientIpHeader?: string;
 }
 
 const DEFAULT_CREDENTIALS_LIMIT = 10;
@@ -67,16 +69,19 @@ const DEFAULT_CREDENTIALS_LIMIT = 10;
 export function createAuthRouter(
   controller: AuthController,
   authenticate: RequestHandler,
-  { credentialsLimit = DEFAULT_CREDENTIALS_LIMIT }: AuthRouterOptions = {},
+  { credentialsLimit = DEFAULT_CREDENTIALS_LIMIT, clientIpHeader }: AuthRouterOptions = {},
 ): Router {
   const router = Router();
+  const byClientIp = clientIpHeader ? { clientIpHeader } : {};
 
   const credentialsLimiter = createRateLimiter({
+    ...byClientIp,
     windowMs: FIFTEEN_MINUTES,
     limit: credentialsLimit,
     message: 'Demasiados intentos. Espera 15 minutos e intenta de nuevo',
   });
   const refreshLimiter = createRateLimiter({
+    ...byClientIp,
     windowMs: FIFTEEN_MINUTES,
     limit: 60,
     message: 'Demasiadas renovaciones de sesión. Intenta más tarde',
