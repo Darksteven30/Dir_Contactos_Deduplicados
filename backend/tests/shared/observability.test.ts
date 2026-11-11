@@ -27,6 +27,10 @@ describe('correlation id, logs estructurados y manejo de errores', () => {
     app.use(correlationId);
     app.use(createRequestLogger(logger));
     app.use(helmet());
+    app.use(express.json());
+    app.post('/eco', (req, res) => {
+      res.json(req.body);
+    });
     app.get('/ok', (_req, res) => {
       logger.info('dentro del controlador');
       res.json({ ok: true });
@@ -81,6 +85,24 @@ describe('correlation id, logs estructurados y manejo de errores', () => {
     const errorLog = lines.find((line) => line.msg === 'Error no controlado');
     expect(errorLog).toMatchObject({ correlationId: 'req-2', err: { message: 'detalle interno que no debe filtrarse' } });
     expect(lines.at(-1)).toMatchObject({ msg: 'Petición fallida', status: 500, level: 50 });
+  });
+
+  it('un cuerpo demasiado grande responde 413 (no 500) y no se registra como error del servidor', async () => {
+    const res = await request(app)
+      .post('/eco')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ texto: 'a'.repeat(150_000) }))
+      .expect(413);
+
+    expect(res.body).toMatchObject({ success: false, message: 'El cuerpo de la petición es demasiado grande' });
+    expect(lines.some((line) => line.msg === 'Error no controlado')).toBe(false);
+    expect(lines.at(-1)).toMatchObject({ msg: 'Petición rechazada', status: 413, level: 40 });
+  });
+
+  it('el JSON mal formado sigue respondiendo 400', async () => {
+    const res = await request(app).post('/eco').set('Content-Type', 'application/json').send('{"roto":').expect(400);
+
+    expect(res.body.message).toBe('JSON mal formado');
   });
 
   it('registra como advertencia las peticiones rechazadas (4xx)', async () => {
