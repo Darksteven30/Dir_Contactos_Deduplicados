@@ -130,6 +130,9 @@ export const useContactsStore = defineStore('contacts', () => {
     const { q, page } = query.value
     const key = cacheKey(q, page, pageSize.value)
     const cached = cache.get(key)
+    // Se numera antes de mirar la caché: si se muestra una página guardada mientras otra
+    // petición sigue en curso, la respuesta de esa petición ya no debe pisar la lista.
+    const request = ++latestRequest
 
     if (cached && !force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
       apply(cached)
@@ -140,7 +143,6 @@ export const useContactsStore = defineStore('contacts', () => {
     // Mientras llega la versión nueva se muestra la anterior, si la hay.
     if (cached) apply(cached)
 
-    const request = ++latestRequest
     status.value = 'loading'
     error.value = null
     try {
@@ -169,6 +171,22 @@ export const useContactsStore = defineStore('contacts', () => {
   /** Los datos del servidor cambiaron: las páginas guardadas ya no son confiables. */
   function invalidate(): void {
     cache.clear()
+  }
+
+  /**
+   * Olvida todos los contactos (al cerrar sesión o cambiar de usuario). Solo se conserva la
+   * preferencia de tamaño de página. Las respuestas que sigan en camino se descartan.
+   */
+  function reset(): void {
+    latestRequest++
+    cache.clear()
+    byId.value = {}
+    ids.value = []
+    scores.value = {}
+    total.value = 0
+    query.value = { q: '', page: 1 }
+    status.value = 'idle'
+    error.value = null
   }
 
   async function create(input: ContactInput): Promise<Contact> {
@@ -231,6 +249,7 @@ export const useContactsStore = defineStore('contacts', () => {
     fetchPage,
     setPageSize,
     invalidate,
+    reset,
     create,
     update,
     remove,

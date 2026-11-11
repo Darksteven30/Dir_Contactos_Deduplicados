@@ -103,6 +103,16 @@ describe('createHttpClient', () => {
     expect(server.calls).toHaveLength(1)
   })
 
+  it('si la renovación falla por la conexión, la petición falla sin dar la sesión por expirada', async () => {
+    const server = fakeServer(() => ({ status: 401 }))
+    const hooks = authHooks()
+    vi.mocked(hooks.refreshSession).mockRejectedValue(new ApiError('Sin conexión', 0))
+    const http = createHttpClient(hooks, { adapter: server.adapter })
+
+    await expect(http.get('/contacts')).rejects.toMatchObject({ status: 0 })
+    expect(hooks.onSessionExpired).not.toHaveBeenCalled()
+  })
+
   it('no intenta renovar en las rutas marcadas con skipAuthRefresh (p. ej. login)', async () => {
     const server = fakeServer(() => ({
       status: 401,

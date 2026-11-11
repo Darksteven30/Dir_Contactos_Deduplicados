@@ -54,6 +54,7 @@ export const useDuplicatesStore = defineStore('duplicates', () => {
   const historyError = ref<ApiError | null>(null)
 
   let latestRequest = 0
+  let latestHistoryRequest = 0
 
   const isLoading = computed(() => status.value === 'loading')
   /** Contactos que sobrarían si se fusionaran todos los grupos. */
@@ -141,15 +142,35 @@ export const useDuplicatesStore = defineStore('duplicates', () => {
   }
 
   async function fetchHistory(page = 1): Promise<void> {
+    // Al pasar de página rápido, solo se aplica la respuesta de la última petición.
+    const request = ++latestHistoryRequest
     historyStatus.value = 'loading'
     historyError.value = null
     try {
-      history.value = await duplicatesApi.history({ page, pageSize: HISTORY_PAGE_SIZE })
+      const result = await duplicatesApi.history({ page, pageSize: HISTORY_PAGE_SIZE })
+      if (request !== latestHistoryRequest) return
+      history.value = result
       historyStatus.value = 'success'
     } catch (err) {
+      if (request !== latestHistoryRequest) return
       historyError.value = toApiError(err)
       historyStatus.value = 'error'
     }
+  }
+
+  /**
+   * Olvida los grupos y el historial (al cerrar sesión o cambiar de usuario). Solo se conserva
+   * la preferencia de sensibilidad. Las respuestas que sigan en camino se descartan.
+   */
+  function reset(): void {
+    latestRequest++
+    latestHistoryRequest++
+    groups.value = []
+    status.value = 'idle'
+    error.value = null
+    history.value = null
+    historyStatus.value = 'idle'
+    historyError.value = null
   }
 
   /** Deshace una fusión: los contactos vuelven a estar separados. */
@@ -178,5 +199,6 @@ export const useDuplicatesStore = defineStore('duplicates', () => {
     merge,
     fetchHistory,
     undo,
+    reset,
   }
 })

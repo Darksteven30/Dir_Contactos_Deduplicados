@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Request, RequestHandler } from 'express';
 import { TooManyRequestsError } from '../errors/AppError';
@@ -22,7 +23,10 @@ interface RateLimitOptions {
  */
 export function clientIpOf(req: Request, clientIpHeader?: string): string {
   const fromCdn = clientIpHeader ? req.get(clientIpHeader)?.split(',')[0]?.trim() : undefined;
-  return fromCdn || req.ip || req.socket.remoteAddress || 'desconocida';
+  // Solo se acepta una IP válida: si alguna petición llegara sin pasar por el CDN, un texto
+  // inventado (distinto en cada intento) no debe abrir un contador nuevo y evadir el límite.
+  const trustedCdnIp = fromCdn && isIP(fromCdn) !== 0 ? fromCdn : undefined;
+  return trustedCdnIp || req.ip || req.socket.remoteAddress || 'desconocida';
 }
 
 /** Limita peticiones por IP; el exceso se responde con 429 en el formato estándar de la API. */

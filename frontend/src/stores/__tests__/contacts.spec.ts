@@ -110,6 +110,45 @@ describe('useContactsStore', () => {
     expect(store.ids).toEqual([2])
   })
 
+  it('al volver a una página en caché, la respuesta de otra petición en curso no la pisa', async () => {
+    let resolvePage2!: (value: Page<Contact>) => void
+    vi.mocked(contactsApi.list)
+      .mockResolvedValueOnce(page([contact(1, 'Ana')], 20))
+      .mockReturnValueOnce(new Promise((resolve) => (resolvePage2 = resolve)))
+    const store = useContactsStore()
+    await store.fetchPage({ page: 1 })
+
+    const loadingPage2 = store.fetchPage({ page: 2 })
+    await store.fetchPage({ page: 1 })
+    resolvePage2(page([contact(11, 'Zoe')], 20))
+    await loadingPage2
+
+    expect(store.query.page).toBe(1)
+    expect(store.ids).toEqual([1])
+  })
+
+  it('reset olvida los contactos y descarta las respuestas que sigan en camino', async () => {
+    let resolveSlow!: (value: Page<Contact>) => void
+    vi.mocked(contactsApi.list)
+      .mockResolvedValueOnce(page([contact(1, 'Ana')]))
+      .mockReturnValueOnce(new Promise((resolve) => (resolveSlow = resolve)))
+      .mockResolvedValueOnce(page([contact(5, 'Beto')]))
+    const store = useContactsStore()
+    await store.fetchPage({ page: 1 })
+    const slow = store.fetchPage({ page: 1 }, { force: true })
+
+    store.reset()
+    resolveSlow(page([contact(1, 'Ana')]))
+    await slow
+
+    expect(store.byId).toEqual({})
+    expect(store.ids).toEqual([])
+    expect(store.status).toBe('idle')
+    // La caché también se vació: la siguiente carga va al servidor.
+    await store.fetchPage({ page: 1 })
+    expect(store.ids).toEqual([5])
+  })
+
   it('expone el error si la carga falla', async () => {
     vi.mocked(contactsApi.list).mockRejectedValue(new ApiError('Sin conexión', 0))
     const store = useContactsStore()
