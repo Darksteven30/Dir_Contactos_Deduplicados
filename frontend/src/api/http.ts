@@ -21,7 +21,10 @@ declare module 'axios' {
 /** Puente con el store de autenticación (se conecta en main.ts para evitar dependencias circulares). */
 export interface AuthHooks {
   getAccessToken: () => string | null
-  /** Renueva la sesión con la cookie del refresh token; devuelve el nuevo access token o null. */
+  /**
+   * Renueva la sesión con la cookie del refresh token; devuelve el nuevo access token, o null si
+   * el servidor la rechazó. Si falla la conexión lanza el error: la petición falla sin cerrar la sesión.
+   */
   refreshSession: () => Promise<string | null>
   /** La sesión no se pudo renovar: hay que volver a iniciar sesión. */
   onSessionExpired: () => void
