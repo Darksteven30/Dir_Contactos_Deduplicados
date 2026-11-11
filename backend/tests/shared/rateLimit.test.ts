@@ -88,6 +88,17 @@ describe('rate limit detrás de Cloudflare + Render', () => {
     expect(await statuses(app, attacker)).toEqual([401, 401, 429]);
   });
 
+  it('un CF-Connecting-IP inventado que no es una IP no abre contadores nuevos', async () => {
+    // Si una petición llegara sin pasar por Cloudflare, el atacante controlaría el encabezado.
+    const app = appBehindProxies({ trustProxy: 0, clientIpHeader: 'cf-connecting-ip' });
+    const forged = (value: string) => request(app).post('/login').set('CF-Connecting-IP', value);
+
+    const results = [];
+    for (const value of ['intento-1', 'intento-2', 'intento-3']) results.push((await forged(value)).status);
+
+    expect(results).toEqual([401, 401, 429]);
+  });
+
   it('sin encabezado del CDN (desarrollo local) cuenta por la IP de la conexión', async () => {
     const app = appBehindProxies({ trustProxy: 0, clientIpHeader: 'cf-connecting-ip' });
     const local = () => request(app).post('/login');

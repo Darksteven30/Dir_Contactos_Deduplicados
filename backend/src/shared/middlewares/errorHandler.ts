@@ -16,6 +16,30 @@ function isMalformedJson(err: unknown): boolean {
   return err instanceof SyntaxError && 'type' in err && err.type === 'entity.parse.failed';
 }
 
+/**
+ * Errores 4xx que lanza el lector del body de Express (body-parser): cuerpo demasiado grande,
+ * codificación no soportada, etc. Son culpa de la petición, no del servidor.
+ */
+function isHttpClientError(err: unknown): err is { status: number; type?: unknown } {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    typeof err.status === 'number' &&
+    err.status >= 400 &&
+    err.status < 500 &&
+    'expose' in err &&
+    err.expose === true
+  );
+}
+
+const BODY_ERROR_MESSAGES: Record<string, string> = {
+  'entity.too.large': 'El cuerpo de la petición es demasiado grande',
+  'encoding.unsupported': 'Codificación del cuerpo no soportada',
+  'charset.unsupported': 'Juego de caracteres del cuerpo no soportado',
+  'request.aborted': 'La petición fue interrumpida',
+};
+
 export const notFoundHandler: RequestHandler = (req) => {
   throw new NotFoundError(`Ruta no encontrada: ${req.method} ${req.originalUrl}`);
 };
@@ -38,6 +62,9 @@ export function createErrorHandler(logger: Logger): ErrorRequestHandler {
       appError = new ConflictError('El recurso ya existe');
     } else if (isMalformedJson(err)) {
       appError = new AppError('JSON mal formado', 400);
+    } else if (isHttpClientError(err)) {
+      const message = typeof err.type === 'string' ? BODY_ERROR_MESSAGES[err.type] : undefined;
+      appError = new AppError(message ?? 'Petición inválida', err.status);
     } else {
       logger.error({ err }, 'Error no controlado');
       appError = new AppError('Error interno del servidor', 500);

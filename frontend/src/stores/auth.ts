@@ -3,6 +3,16 @@ import { computed, ref } from 'vue'
 import { authApi } from '@/api/auth'
 import { ApiError, toApiError } from '@/api/errors'
 import type { AuthSession, LoginCredentials, RegisterData, User } from '@/types/api'
+import { useContactsStore } from './contacts'
+import { useDuplicatesStore } from './duplicates'
+
+/** Esperas antes de reintentar la renovación de la sesión cuando falla la conexión o el servidor. */
+export const REFRESH_RETRY_DELAYS_MS = [500, 1500] as const
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+// Sin respuesta (0) o servidor caído (5xx): el refresh token puede seguir siendo válido.
+const isTransient = (error: ApiError) => error.status === 0 || error.status >= 500
 
 /**
  * Sesión del usuario.
@@ -26,7 +36,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   let restoring: Promise<void> | null = null
 
+  // Los datos cargados pertenecen al usuario de la sesión: al cerrarla o cambiar de usuario se
+  // descartan, para que quien entre después en el mismo navegador no vea los contactos del anterior.
+  function resetUserData(): void {
+    useContactsStore().reset()
+    useDuplicatesStore().reset()
+  }
+
   function setSession(session: AuthSession): void {
+    if (user.value && user.value.id !== session.user.id) resetUserData()
     accessToken.value = session.accessToken
     user.value = session.user
   }
@@ -34,6 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
   function clearSession(): void {
     accessToken.value = null
     user.value = null
+    resetUserData()
   }
 
   // Envuelve login/registro/logout: marca la carga y guarda el error para mostrarlo en la vista.
@@ -84,24 +103,42 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Pide un access token nuevo con la cookie del refresh token. La usa el cliente HTTP cuando
-   * el token vence (401). Devuelve el token, o null si la sesión ya no es válida.
+   * el token vence (401). Devuelve el token, o null si el servidor rechazó la sesión.
+   * Ante un fallo de conexión o del servidor reintenta con backoff y, si persiste, lanza el
+   * ApiError sin cerrar la sesión: un corte momentáneo no debe sacar al usuario.
    */
   async function refreshSession(): Promise<string | null> {
-    try {
-      const session = await authApi.refresh()
-      setSession(session)
-      return session.accessToken
-    } catch {
-      clearSession()
-      return null
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const session = await authApi.refresh()
+        setSession(session)
+        return session.accessToken
+      } catch (err) {
+        const apiError = toApiError(err)
+        if (!isTransient(apiError)) {
+          clearSession()
+          return null
+        }
+        const delay = REFRESH_RETRY_DELAYS_MS[attempt]
+        if (delay === undefined) throw apiError
+        await wait(delay)
+      }
     }
   }
 
-  /** Recupera la sesión al abrir o recargar la app. Se ejecuta una sola vez aunque se llame varias. */
+  /**
+   * Recupera la sesión al abrir o recargar la app. Se ejecuta una sola vez aunque se llame varias;
+   * si falló por la conexión, la siguiente navegación lo vuelve a intentar.
+   */
   function restoreSession(): Promise<void> {
-    restoring ??= refreshSession().then(() => {
-      initialized.value = true
-    })
+    restoring ??= refreshSession()
+      .then(() => undefined)
+      .catch(() => {
+        restoring = null
+      })
+      .finally(() => {
+        initialized.value = true
+      })
     return restoring
   }
 
